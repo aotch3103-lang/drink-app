@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ドリンク券管理</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -60,7 +60,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    .page { padding: 14px; max-width: 480px; margin: 0 auto; }
+    .page { padding: 14px; max-width: 1200px; margin: 0 auto; }
 
     /* ヘッダーロゴ風アクセント */
     .app-header {
@@ -213,7 +213,7 @@
     /* 確認ダイアログ */
     .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(26,22,50,0.45); align-items: flex-end; justify-content: center; z-index: 100; }
     .confirm-overlay.show { display: flex; }
-    .confirm-box { background: var(--surface-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1.5rem 1.25rem 2rem; width: 100%; max-width: 480px; border-top: 3px solid; border-image: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)) 1; }
+    .confirm-box { background: var(--surface-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1.5rem 1.25rem 2rem; width: 100%; max-width: 520px; border-top: 3px solid; border-image: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)) 1; }
     .confirm-box p { font-size: 16px; color: var(--text-primary); margin: 0 0 1.25rem; white-space: pre-wrap; font-weight: 500; }
     .confirm-actions { display: flex; flex-direction: column; gap: 8px; }
     .confirm-cancel { width: 100%; padding: 13px; font-size: 15px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-pill); background: none; color: var(--text-secondary); cursor: pointer; font-weight: 600; }
@@ -225,7 +225,7 @@
     /* ドリンクオプション ポップアップ */
     .drink-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(26,22,50,0.5); align-items: flex-end; justify-content: center; z-index: 110; }
     .drink-popup-overlay.show { display: flex; }
-    .drink-popup { background: var(--surface-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1.5rem 1.25rem 2.5rem; width: 100%; max-width: 480px; border-top: 3px solid; border-image: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)) 1; }
+    .drink-popup { background: var(--surface-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1.5rem 1.25rem 2.5rem; width: 100%; max-width: 520px; border-top: 3px solid; border-image: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)) 1; }
     .drink-popup-title { font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 4px; text-align: center; }
     .drink-popup-base-price { font-size: 13px; color: var(--text-muted); text-align: center; margin: 0 0 20px; font-weight: 500; }
     .popup-section-label { font-size: 11px; color: var(--text-muted); font-weight: 700; margin: 0 0 9px; letter-spacing: 0.08em; text-transform: uppercase; }
@@ -248,6 +248,63 @@
     .popup-actions { display: flex; gap: 8px; }
     .popup-cancel-btn { flex: 1; padding: 13px; font-size: 15px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-pill); background: none; color: var(--text-secondary); cursor: pointer; font-weight: 600; }
     .popup-order-btn { flex: 2; padding: 13px; font-size: 15px; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; font-weight: 700; box-shadow: 0 2px 10px rgba(56,189,248,0.3); }
+    /* ━━━ PC専用レイアウト (900px以上) ━━━ */
+    @media (min-width: 900px) {
+      .page { padding: 28px 40px; }
+
+      /* ヘッダー */
+      .app-header { text-align: left; display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+      .app-header-title { font-size: 24px; }
+
+      /* タブバー */
+      .tabs { max-width: 560px; }
+      .tab { font-size: 13px; padding: 9px 0; }
+
+      /* 顧客一覧：2列グリッド */
+      .customer-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+      /* ホバー・マウス操作対応 */
+      .btn:hover { opacity: 0.82; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(167,139,250,0.2); }
+      .btn:active { transform: scale(0.97); }
+      .btn-order:hover { box-shadow: 0 4px 16px rgba(255,107,157,0.45); }
+      .drink-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(167,139,250,0.18); border-color: var(--pop-pink); }
+      .drink-card:active { transform: scale(0.96); }
+      .customer-item { transition: box-shadow 0.15s, transform 0.15s; }
+      .customer-item:hover { box-shadow: 0 4px 16px rgba(167,139,250,0.12); transform: translateY(-1px); }
+
+      /* 注文画面：左サイドバー＋右メインの2カラム */
+      .pc-order-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+      .pc-sidebar { position: sticky; top: 20px; }
+      .pc-sidebar-title { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 10px; }
+      .pc-sidebar-list { display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 160px); overflow-y: auto; }
+      .pc-sidebar-item { padding: 10px 14px; border-radius: var(--radius-md); border: 1.5px solid var(--border); background: var(--surface-2); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-primary); transition: background 0.15s, border-color 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .pc-sidebar-item:hover { background: var(--pop-pink-light); border-color: var(--pop-pink); }
+      .pc-sidebar-item.active { background: var(--pop-pink-light); border-color: var(--pop-pink); color: var(--pop-pink-dark); font-weight: 700; }
+      @media (prefers-color-scheme: dark) {
+        .pc-sidebar-item:hover, .pc-sidebar-item.active { background: #2A1E4A; border-color: var(--pop-pink); color: var(--pop-pink); }
+      }
+
+      /* ドリンクグリッド：4列 */
+      .drink-grid { grid-template-columns: repeat(4, 1fr); }
+
+      /* ダイアログ・ポップアップ：PC中央表示 */
+      .confirm-overlay { align-items: center; }
+      .confirm-box { border-radius: var(--radius-lg); border-top: none; border: 2px solid var(--pop-pink); box-shadow: 0 8px 40px rgba(167,139,250,0.25); }
+      .confirm-actions { flex-direction: row-reverse; gap: 10px; }
+      .confirm-ok, .confirm-cancel { flex: 1; }
+
+      .drink-popup-overlay { align-items: center; }
+      .drink-popup { border-radius: var(--radius-lg); border-top: none; border: 2px solid var(--pop-pink); box-shadow: 0 8px 40px rgba(167,139,250,0.25); }
+
+      /* 検索バーの幅を制限 */
+      .search-wrap { max-width: 560px; }
+
+      /* ボタンサイズを少し引き締め */
+      .btn { padding: 7px 13px; min-height: 34px; font-size: 13px; }
+      .btn-order { font-size: 14px; }
+      .search-input { height: 40px; font-size: 14px; }
+      .search-btn, .search-clear { height: 40px; }
+    }
   </style>
 </head>
 <body>
@@ -881,36 +938,52 @@
 
       const ticketBadge = c.tickets > 1 ? `<span class="tickets-badge">${c.tickets}枚所持</span>` : '';
 
+      // PC用サイドバー：全顧客の名前一覧（現在選択中をハイライト）
+      const sidebarItems = customers.map(cu =>
+        `<div class="pc-sidebar-item${cu.id === c.id ? ' active' : ''}" data-order="${cu.id}">
+          ${cu.name}
+          <span style="float:right;font-size:11px;color:var(--text-muted);">¥${cu.balance.toLocaleString()}</span>
+        </div>`
+      ).join('');
+
       return `
-        <button class="back-btn" id="back-btn">← 一覧に戻る</button>
-        <div class="card">
-          <p style="font-size:11px;color:var(--text-muted);margin:0 0 2px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">注文中</p>
-          <p style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0 0 12px;">${c.name} 様 ${ticketBadge}</p>
-          <div class="balance-bar">
-            <span class="bal-big${low?' low':''}">残 ¥${c.balance.toLocaleString()}</span>
-            <div class="prog-bg"><div class="prog-fill${low?' low':''}" style="width:${pct}%"></div></div>
-            <span style="font-size:12px;color:var(--text-muted);font-weight:600;">${pct}%</span>
+        <div class="pc-order-layout">
+          <div class="pc-sidebar">
+            <button class="back-btn" id="back-btn" style="width:100%;margin-bottom:12px;justify-content:center;">← 一覧に戻る</button>
+            <p class="pc-sidebar-title">顧客一覧</p>
+            <div class="pc-sidebar-list">${sidebarItems}</div>
           </div>
-          <div class="alert" id="alert-msg"></div>
-          <p class="section-title">メニュー（タップで注文）</p>
-          <div class="drink-grid">${drinkCards || '<p style="color:var(--text-muted);">メニューがありません</p>'}</div>
-        </div>
-        <div class="card">
-          <p class="section-title">今回の注文</p>
-          ${c.orders.length === 0 ? '<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:8px 0;">まだ注文がありません</p>' : `${currentRows}
-               <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:10px;color:var(--text-primary);">
-                 <span>合計</span><span>¥${currentTotal.toLocaleString()}</span>
-               </div>
-               <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap;">
-                 <button class="undo-btn" id="undo-btn">↩ 最後を取り消す</button>
-                 <button class="undo-btn" id="reset-orders-btn" style="color:var(--pop-orange);">🔄 全リセット</button>
-                 <button class="undo-btn" id="save-session-btn" style="color:var(--pop-pink-dark);">✅ 来店確定</button>
-               </div>`}
-        </div>
-        <div class="card">
-          <p class="section-title">来店履歴（本日分）</p>
-          ${sessionHistory}
-          ${hiddenNote}
+          <div class="pc-main">
+            <div class="card">
+              <p style="font-size:11px;color:var(--text-muted);margin:0 0 2px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">注文中</p>
+              <p style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0 0 12px;">${c.name} 様 ${ticketBadge}</p>
+              <div class="balance-bar">
+                <span class="bal-big${low?' low':''}">残 ¥${c.balance.toLocaleString()}</span>
+                <div class="prog-bg"><div class="prog-fill${low?' low':''}" style="width:${pct}%"></div></div>
+                <span style="font-size:12px;color:var(--text-muted);font-weight:600;">${pct}%</span>
+              </div>
+              <div class="alert" id="alert-msg"></div>
+              <p class="section-title">メニュー（クリックで注文）</p>
+              <div class="drink-grid">${drinkCards || '<p style="color:var(--text-muted);">メニューがありません</p>'}</div>
+            </div>
+            <div class="card">
+              <p class="section-title">今回の注文</p>
+              ${c.orders.length === 0 ? '<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:8px 0;">まだ注文がありません</p>' : `${currentRows}
+                   <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:10px;color:var(--text-primary);">
+                     <span>合計</span><span>¥${currentTotal.toLocaleString()}</span>
+                   </div>
+                   <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end;flex-wrap:wrap;">
+                     <button class="undo-btn" id="undo-btn">↩ 最後を取り消す</button>
+                     <button class="undo-btn" id="reset-orders-btn" style="color:var(--pop-orange);">🔄 全リセット</button>
+                     <button class="undo-btn" id="save-session-btn" style="color:var(--pop-pink-dark);">✅ 来店確定</button>
+                   </div>`}
+            </div>
+            <div class="card">
+              <p class="section-title">来店履歴（本日分）</p>
+              ${sessionHistory}
+              ${hiddenNote}
+            </div>
+          </div>
         </div>
       `;
     }
