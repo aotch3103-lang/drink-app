@@ -120,6 +120,7 @@
     }
 
     .customer-item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ticket-nums { font-size: 12px; color: var(--text-secondary); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; margin-bottom: 10px; font-weight: 500; word-break: break-all; }
 
     /* ボタン共通 */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: var(--radius-pill); cursor: pointer; font-size: 13px; padding: 8px 14px; border: 1.5px solid var(--border); background: none; color: var(--text-primary); white-space: nowrap; min-height: 38px; font-weight: 500; transition: transform 0.1s, box-shadow 0.1s; }
@@ -143,8 +144,8 @@
 
     /* 新規追加フォーム */
     .add-form { display: flex; flex-direction: column; gap: 10px; }
-    .add-form input[type=text] { width: 100%; height: 48px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 18px; font-size: 16px; background: var(--surface-2); color: var(--text-primary); outline: none; }
-    .add-form input[type=text]:focus { border-color: var(--pop-pink); box-shadow: 0 0 0 3px var(--pop-pink-light); }
+    .add-form input[type=text], .add-form input[type=number] { width: 100%; height: 48px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 18px; font-size: 16px; background: var(--surface-2); color: var(--text-primary); outline: none; }
+    .add-form input[type=text]:focus, .add-form input[type=number]:focus { border-color: var(--pop-pink); box-shadow: 0 0 0 3px var(--pop-pink-light); }
     .btn-add { width: 100%; height: 48px; font-size: 15px; font-weight: 700; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; box-shadow: 0 2px 10px rgba(52,211,153,0.3); }
 
     /* 注文画面 */
@@ -285,6 +286,22 @@
         </div>
       </div>
     </div>
+
+    <div class="drink-popup-overlay" id="ticket-manage-overlay">
+      <div class="drink-popup">
+        <p class="drink-popup-title" id="ticket-manage-name"></p>
+        <p class="drink-popup-base-price">所持しているチケット№の確認・削除・開始番号の変更ができます</p>
+        <div id="ticket-manage-list" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 18px;"></div>
+        <p class="popup-section-label">開始番号を変更してリナンバー</p>
+        <div class="popup-option-row" style="align-items:center;">
+          <input type="number" id="ticket-renumber-start" min="1" value="1" style="flex:1;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:16px;background:var(--surface-1);color:var(--text-primary);outline:none;" />
+          <button class="popup-order-btn" id="ticket-renumber-btn" style="flex:1;">適用</button>
+        </div>
+        <div class="popup-actions">
+          <button class="popup-cancel-btn" id="ticket-manage-close-btn">閉じる</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -313,7 +330,7 @@
     ];
 
     const DEFAULT_CUSTOMERS = INITIAL_NAMES.map((name, i) => ({
-      id: i + 1, name, balance: 1200, tickets: 1, orders: [], sessions: [], editing: false
+      id: i + 1, name, balance: 1200, tickets: 1, ticketNumbers: [1], orders: [], sessions: [], editing: false
     }));
 
     const BALANCE_OPTIONS = Array.from({ length: 121 }, (_, i) => i * 50);
@@ -332,7 +349,10 @@
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return false;
         const data = JSON.parse(raw);
-        if (data.customers) customers = data.customers;
+        if (data.customers) customers = data.customers.map(c => ({
+          ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
+          ...c
+        }));
         if (data.menu) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
         if (data.nextId) nextId = data.nextId;
         if (data.nextMenuId) nextMenuId = data.nextMenuId;
@@ -348,6 +368,7 @@
 
     let view = 'list', selectedId = null, tab = 'list', searchQuery = '', searchDone = false, confirmCallback = null;
     let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
+    let manageTicketsId = null;
 
     function getCustomer(id) { return customers.find(c => c.id === id); }
 
@@ -389,6 +410,10 @@
       const empty = c.balance === 0;
       const balClass = empty ? 'empty' : low ? 'low' : '';
       const ticketBadge = c.tickets > 1 ? `<span class="tickets-badge">${c.tickets}枚</span>` : '';
+      const nums = (c.ticketNumbers || []).slice().sort((a,b) => a-b);
+      const ticketNumsLine = nums.length
+        ? `<div class="ticket-nums">№：${nums.join(', ')}</div>`
+        : '';
       const editRow = c.editing ? `
         <div class="edit-row">
           <select class="edit-bal-select" data-id="${c.id}">
@@ -401,9 +426,11 @@
           <span class="customer-name">${c.name}${ticketBadge}</span>
           <span class="balance-display ${balClass}">¥${c.balance.toLocaleString()}</span>
         </div>
+        ${ticketNumsLine}
         <div class="customer-item-actions">
           <button class="btn btn-order" data-order="${c.id}">🍹 注文</button>
           <button class="btn btn-ticket" data-addticket="${c.id}">+1枚</button>
+          <button class="btn btn-edit" data-manage-tickets="${c.id}">🎫</button>
           <button class="btn btn-edit" data-edit="${c.id}">✏️</button>
           <button class="btn btn-reset" data-reset="${c.id}">🔄</button>
           <button class="btn btn-delete" data-delete="${c.id}">🗑</button>
@@ -502,6 +529,62 @@
       popupItemId = null;
     }
 
+    function openTicketManage(id) {
+      manageTicketsId = id;
+      renderTicketManage();
+      document.getElementById('ticket-manage-overlay').classList.add('show');
+    }
+
+    function closeTicketManage() {
+      document.getElementById('ticket-manage-overlay').classList.remove('show');
+      manageTicketsId = null;
+    }
+
+    function renderTicketManage() {
+      const c = getCustomer(manageTicketsId);
+      if (!c) return;
+      if (!c.ticketNumbers) c.ticketNumbers = [];
+      document.getElementById('ticket-manage-name').textContent = `${c.name} 様のチケット№`;
+      const nums = c.ticketNumbers.slice().sort((a,b) => a-b);
+      const listEl = document.getElementById('ticket-manage-list');
+      listEl.innerHTML = nums.length
+        ? nums.map(n => `
+          <span style="display:inline-flex;align-items:center;gap:6px;background:var(--pop-pink-light);color:var(--pop-pink-dark);border-radius:var(--radius-pill);padding:6px 8px 6px 14px;font-size:14px;font-weight:700;">
+            №${n}
+            <button data-del-ticket="${n}" style="border:none;background:rgba(0,0,0,0.08);color:inherit;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;">✕</button>
+          </span>`).join('')
+        : '<p style="color:var(--text-muted);font-size:13px;">チケット№がありません</p>';
+      const startInp = document.getElementById('ticket-renumber-start');
+      startInp.value = nums.length ? nums[0] : 1;
+      listEl.querySelectorAll('[data-del-ticket]').forEach(btn => {
+        btn.onclick = () => {
+          const n = parseInt(btn.dataset.delTicket);
+          showConfirm(`№${n}を削除しますか？`, '削除する', () => {
+            c.ticketNumbers = c.ticketNumbers.filter(x => x !== n);
+            c.tickets = c.ticketNumbers.length;
+            saveData(); renderTicketManage(); renderCustomerList();
+          });
+        };
+      });
+    }
+
+    function attachTicketManageEvents() {
+      const closeBtn = document.getElementById('ticket-manage-close-btn');
+      if (closeBtn) closeBtn.onclick = closeTicketManage;
+      const overlay = document.getElementById('ticket-manage-overlay');
+      if (overlay) overlay.onclick = (e) => { if (e.target === e.currentTarget) closeTicketManage(); };
+      const renumberBtn = document.getElementById('ticket-renumber-btn');
+      if (renumberBtn) renumberBtn.onclick = () => {
+        const c = getCustomer(manageTicketsId);
+        if (!c) return;
+        let start = parseInt(document.getElementById('ticket-renumber-start').value);
+        if (isNaN(start) || start < 1) { showToast('正しい開始番号を入力してください'); return; }
+        const count = c.ticketNumbers.length;
+        c.ticketNumbers = Array.from({ length: count }, (_, i) => start + i);
+        saveData(); showToast(`№${start}からの連番に変更しました`); renderTicketManage(); renderCustomerList();
+      };
+    }
+
     function updateMenuPrice(id, newPrice) {
       const price = parseInt(newPrice);
       if (isNaN(price) || price < 0) { showToast('正しい金額を入力してください'); render(); return; }
@@ -561,6 +644,8 @@
             <p class="section-title">新しいお客様を追加（残高1200円でスタート）</p>
             <div class="add-form">
               <input type="text" id="new-name" placeholder="お名前を入力" maxlength="20" />
+              <label class="section-title" style="margin:4px 0 -4px;text-transform:none;letter-spacing:normal;">開始チケット№</label>
+              <input type="number" id="new-start-ticket" placeholder="開始チケット№（初期値：1）" min="1" value="1" />
               <button class="btn-add" id="add-btn">✨ 追加する</button>
             </div>
           </div>
@@ -685,9 +770,15 @@
       document.querySelectorAll('[data-addticket]').forEach(el => {
         el.onclick = () => {
           const c = getCustomer(parseInt(el.dataset.addticket));
+          if (!c.ticketNumbers) c.ticketNumbers = [];
+          const newNum = c.ticketNumbers.length ? Math.max(...c.ticketNumbers) + 1 : 1;
+          c.ticketNumbers.push(newNum);
           c.balance += 1200; c.tickets += 1;
-          saveData(); showToast(`${c.name} さんに+1枚追加しました`); renderCustomerList();
+          saveData(); showToast(`${c.name} さんに№${newNum}を追加しました`); renderCustomerList();
         };
+      });
+      document.querySelectorAll('[data-manage-tickets]').forEach(el => {
+        el.onclick = () => { openTicketManage(parseInt(el.dataset.manageTickets)); };
       });
       document.querySelectorAll('[data-edit]').forEach(el => {
         el.onclick = () => {
@@ -708,7 +799,7 @@
         el.onclick = () => {
           const c = getCustomer(parseInt(el.dataset.reset));
           showConfirm(`「${c.name}」さんの注文・残高・枚数を\n初期状態に戻しますか？`, '全リセットする', () => {
-            c.orders = []; c.balance = 1200; c.tickets = 1;
+            c.orders = []; c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1];
             saveData(); showToast(`${c.name} さんをリセットしました`); renderCustomerList();
           });
         };
@@ -743,9 +834,12 @@
         const inp = document.getElementById('new-name');
         const name = inp.value.trim();
         if (!name) { inp.focus(); return; }
-        customers.push({ id: nextId++, name, balance: 1200, tickets: 1, orders: [], sessions: [], editing: false });
-        inp.value = ''; tab = 'list'; searchQuery = ''; searchDone = false;
-        saveData(); showToast(`${name} さんを追加しました`); render();
+        const startInp = document.getElementById('new-start-ticket');
+        let startNum = parseInt(startInp.value);
+        if (isNaN(startNum) || startNum < 1) startNum = 1;
+        customers.push({ id: nextId++, name, balance: 1200, tickets: 1, ticketNumbers: [startNum], orders: [], sessions: [], editing: false });
+        inp.value = ''; startInp.value = '1'; tab = 'list'; searchQuery = ''; searchDone = false;
+        saveData(); showToast(`${name} さんを追加しました（№${startNum}）`); render();
       };
 
       const menuAddBtn = document.getElementById('menu-add-btn');
@@ -836,7 +930,7 @@
       const resetAllBtn = document.getElementById('reset-all-customers-btn');
       if (resetAllBtn) resetAllBtn.onclick = () => {
         showConfirm('全員をリセットしますか？', 'リセット', () => {
-          customers.forEach(c => { c.balance = 1200; c.tickets = 1; c.orders = []; c.sessions = []; c.editing = false; });
+          customers.forEach(c => { c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1]; c.orders = []; c.sessions = []; c.editing = false; });
           saveData(); render();
         });
       };
@@ -849,6 +943,7 @@
       };
     }
     render();
+    attachTicketManageEvents();
   </script>
 </body>
 </html>
