@@ -370,6 +370,18 @@
     let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
     let manageTicketsId = null;
 
+    // ── 早朝5時リセット（営業日）ロジック ──────────────────────────
+    // 当日午前5時を基準に「営業日」を判定する。
+    // 5時以降 → 営業日は本日の日付
+    // 5時より前 → 営業日は前日の日付（深夜営業の延長とみなす）
+    // この判定は来店履歴の「表示」だけに使用し、残高計算には一切影響させない。
+    function getBusinessDateKey(d) {
+      const dt = new Date(d);
+      if (dt.getHours() < 5) dt.setDate(dt.getDate() - 1);
+      return `${dt.getFullYear()}-${dt.getMonth()+1}-${dt.getDate()}`;
+    }
+    const CURRENT_BUSINESS_DATE = getBusinessDateKey(new Date());
+
     function getCustomer(id) { return customers.find(c => c.id === id); }
 
     function nowStr() {
@@ -634,7 +646,7 @@
         </div>
         ${tab === 'list' ? `
           <div class="search-wrap">
-            <input class="search-input" id="search-input" placeholder="名前で検索…" value="${searchQuery}" />
+            <input class="search-input" id="search-input" placeholder="名前で検索…" value="${searchQuery}" inputmode="text" lang="ja" autocomplete="off" />
             <button class="search-btn" id="search-btn">検索</button>
             ${searchDone ? `<button class="search-clear" id="search-clear">✕</button>` : ''}
           </div>
@@ -643,7 +655,7 @@
           <div class="card">
             <p class="section-title">新しいお客様を追加（残高1200円でスタート）</p>
             <div class="add-form">
-              <input type="text" id="new-name" placeholder="お名前を入力" maxlength="20" />
+              <input type="text" id="new-name" placeholder="お名前を入力" maxlength="20" inputmode="text" lang="ja" autocomplete="off" />
               <label class="section-title" style="margin:4px 0 -4px;text-transform:none;letter-spacing:normal;">開始チケット№</label>
               <input type="number" id="new-start-ticket" placeholder="開始チケット№（初期値：1）" min="1" value="1" />
               <button class="btn-add" id="add-btn">✨ 追加する</button>
@@ -656,7 +668,7 @@
             <div class="menu-add-form">
               <p class="section-title" style="margin-bottom:4px;">✨ 新しいメニューを追加</p>
               <div class="menu-add-inputs">
-                <input class="inp-name" type="text" id="menu-name" placeholder="品名（例：コーヒー）" maxlength="15" />
+                <input class="inp-name" type="text" id="menu-name" placeholder="品名（例：コーヒー）" maxlength="15" inputmode="text" lang="ja" autocomplete="off" />
                 <input class="inp-price" type="number" id="menu-price" placeholder="金額" min="0" max="9999" step="50" />
               </div>
               <div class="menu-add-options">
@@ -719,14 +731,21 @@
       ).join('');
       const currentTotal = c.orders.reduce((s, o) => s + o.price, 0);
 
-      const sessionHistory = c.sessions.length
-        ? c.sessions.slice().reverse().map(s => `
+      // 早朝5時リセット：本日の営業日に属する来店履歴のみ表示する（残高には影響なし）。
+      // timestampを持たない旧データ（保存形式の互換性のため）は従来通りすべて表示する。
+      const visibleSessions = c.sessions.filter(s => !s.timestamp || getBusinessDateKey(s.timestamp) === CURRENT_BUSINESS_DATE);
+      const hiddenCount = c.sessions.length - visibleSessions.length;
+      const sessionHistory = visibleSessions.length
+        ? visibleSessions.slice().reverse().map(s => `
             <div class="history-session">
               <p class="history-date">📅 ${s.date}</p>
               <p class="history-items">${s.items.map(i => `${i.name}×${i.count}`).join('、')}</p>
               <p class="history-total">合計 ¥${s.total.toLocaleString()}</p>
             </div>`).join('')
         : '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:6px 0;">来店履歴はありません</p>';
+      const hiddenNote = hiddenCount > 0
+        ? `<p style="color:var(--text-muted);font-size:11px;text-align:center;margin:4px 0 0;">※前営業日以前の履歴 ${hiddenCount} 件は非表示（早朝5時で切替）</p>`
+        : '';
 
       const ticketBadge = c.tickets > 1 ? `<span class="tickets-badge">${c.tickets}枚所持</span>` : '';
 
@@ -757,8 +776,9 @@
                </div>`}
         </div>
         <div class="card">
-          <p class="section-title">来店履歴</p>
+          <p class="section-title">来店履歴（本日分）</p>
           ${sessionHistory}
+          ${hiddenNote}
         </div>
       `;
     }
@@ -915,7 +935,7 @@
           grouped[key].count++;
         });
         const total = c.orders.reduce((s, o) => s + o.price, 0);
-        c.sessions.push({ date: nowStr(), items: Object.values(grouped), total });
+        c.sessions.push({ date: nowStr(), timestamp: Date.now(), items: Object.values(grouped), total });
         c.orders = []; saveData(); showToast('来店を確定しました'); render();
       };
 
