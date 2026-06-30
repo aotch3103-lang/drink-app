@@ -368,6 +368,7 @@
 
     let view = 'list', selectedId = null, tab = 'list', searchQuery = '', searchDone = false, confirmCallback = null;
     let historyFrom = '', historyTo = ''; // 履歴タブの日付絞り込み（from/to）。タブを行き来しても値は保持される。
+    let lastBackupAt = localStorage.getItem(STORAGE_KEY + '-last-backup') || ''; // 最終バックアップ日時（ページ再読込しても保持）
     let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
     let manageTicketsId = null;
 
@@ -629,6 +630,52 @@
       };
     }
 
+    // ── バックアップ機能 ──────────────────────────
+    // 現在の全データ（customers, menu, nextId, nextMenuId）をJSONファイルとして書き出す。
+    function exportBackup() {
+      const data = {
+        customers: customers.map(c => ({ ...c, editing: false })),
+        menu, nextId, nextMenuId,
+        exportedAt: nowStr()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const d = new Date();
+      const fname = `drink-ticket-backup_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.json`;
+      const a = document.createElement('a');
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      lastBackupAt = nowStr();
+      try { localStorage.setItem(STORAGE_KEY + '-last-backup', lastBackupAt); } catch(e) {}
+      showToast('📤 バックアップを書き出しました');
+      render();
+    }
+
+    // 選択されたJSONバックアップファイルを読み込み、確認の上で現在のデータを上書き復元する。
+    function importBackupFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        let data;
+        try { data = JSON.parse(e.target.result); }
+        catch (err) { showToast('⚠️ ファイルの読み込みに失敗しました'); return; }
+        if (!data || !Array.isArray(data.customers)) { showToast('⚠️ バックアップファイルの形式が正しくありません'); return; }
+        showConfirm('バックアップから復元しますか？\n現在のデータは上書きされます。', '復元する', () => {
+          customers = data.customers.map(c => ({
+            ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
+            ...c
+          }));
+          if (Array.isArray(data.menu)) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
+          if (data.nextId) nextId = data.nextId;
+          if (data.nextMenuId) nextMenuId = data.nextMenuId;
+          saveData();
+          showToast('📥 バックアップから復元しました');
+          render();
+        });
+      };
+      reader.readAsText(file);
+    }
+
     function updateMenuPrice(id, newPrice) {
       const price = parseInt(newPrice);
       if (isNaN(price) || price < 0) { showToast('正しい金額を入力してください'); render(); return; }
@@ -663,6 +710,8 @@
               <p class="history-total">合計 ¥${s.total.toLocaleString()}</p>
             </div>`).join('')
         : `<p style="color:var(--text-muted);text-align:center;padding:1rem 0;">${(historyFrom || historyTo) ? '該当する来店履歴がありません' : 'まだ来店履歴がありません'}</p>`;
+
+      const lastBackupText = lastBackupAt ? `最終バックアップ：${lastBackupAt}` : '';
 
       const menuRows = menu.map((m, index) => {
         const opts = [];
@@ -742,6 +791,26 @@
             </div>
           </div>
         ` : `
+          <div class="card">
+            <p class="section-title">バックアップ</p>
+            <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">万が一データが消えても復元できるよう、定期的なバックアップをおすすめします。</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1.5px dashed var(--border);">
+              <div>
+                <p style="font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 2px;">バックアップを書き出す</p>
+                <p style="font-size:12px;color:var(--text-muted);margin:0;">現在の全データをファイルとして保存</p>
+              </div>
+              <button class="btn btn-ticket" id="backup-export-btn" style="white-space:nowrap;">📤 書き出す</button>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;">
+              <div>
+                <p style="font-size:14px;font-weight:600;color:var(--text-primary);margin:0 0 2px;">バックアップから復元</p>
+                <p style="font-size:12px;color:var(--text-muted);margin:0;">書き出したファイルを選択して上書き復元</p>
+              </div>
+              <button class="btn btn-ticket" id="backup-import-btn" style="white-space:nowrap;">📥 復元する</button>
+              <input type="file" id="backup-import-input" accept="application/json" style="display:none;" />
+            </div>
+            ${lastBackupText ? `<p style="font-size:11px;color:var(--text-muted);margin:10px 0 0;text-align:center;">${lastBackupText}</p>` : ''}
+          </div>
           <div class="card">
             <p class="section-title">データ管理</p>
             <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">データはこのブラウザに自動保存されます。</p>
@@ -1027,6 +1096,20 @@
           saveData(); render();
         });
       };
+
+      // バックアップ：書き出し・復元
+      const exportBtn = document.getElementById('backup-export-btn');
+      if (exportBtn) exportBtn.onclick = exportBackup;
+      const importBtn = document.getElementById('backup-import-btn');
+      const importInput = document.getElementById('backup-import-input');
+      if (importBtn && importInput) {
+        importBtn.onclick = () => importInput.click();
+        importInput.onchange = () => {
+          const file = importInput.files[0];
+          if (file) importBackupFile(file);
+          importInput.value = '';
+        };
+      }
 
       const clearStorageBtn = document.getElementById('clear-storage-btn');
       if (clearStorageBtn) clearStorageBtn.onclick = () => {
