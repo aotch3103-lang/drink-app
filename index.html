@@ -367,6 +367,7 @@
     loadData();
 
     let view = 'list', selectedId = null, tab = 'list', searchQuery = '', searchDone = false, confirmCallback = null;
+    let historyFrom = '', historyTo = ''; // 履歴タブの日付絞り込み（from/to）。タブを行き来しても値は保持される。
     let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
     let manageTicketsId = null;
 
@@ -383,6 +384,37 @@
     const CURRENT_BUSINESS_DATE = getBusinessDateKey(new Date());
 
     function getCustomer(id) { return customers.find(c => c.id === id); }
+
+    // ── 履歴タブ用ヘルパー ──────────────────────────
+    // 全顧客のsessions（来店履歴）を1つの配列にまとめ、新しい順に並べる。
+    // customers配列やsessions自体は変更しない（読み取り専用）。
+    function getAllSessions() {
+      const all = [];
+      customers.forEach(c => {
+        (c.sessions || []).forEach((s, idx) => {
+          all.push({ ...s, customerName: c.name, customerId: c.id, sessionIdx: idx });
+        });
+      });
+      return all.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    }
+
+    function timestampToDateInputValue(ts) {
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    // 日付（from/to）でセッション一覧を絞り込む。timestampを持たない旧データは
+    // 絞り込み条件が指定されていない場合のみ表示する。
+    function filterSessionsByDate(sessions, from, to) {
+      if (!from && !to) return sessions;
+      return sessions.filter(s => {
+        if (!s.timestamp) return false;
+        const dateStr = timestampToDateInputValue(s.timestamp);
+        if (from && dateStr < from) return false;
+        if (to && dateStr > to) return false;
+        return true;
+      });
+    }
 
     function nowStr() {
       const d = new Date();
@@ -618,6 +650,20 @@
     }
 
     function renderListView() {
+      // ── 履歴タブ用：全顧客の来店履歴を取得し、日付で絞り込む ──
+      const allSessions = getAllSessions();
+      const filteredSessions = filterSessionsByDate(allSessions, historyFrom, historyTo);
+      const historyTotal = filteredSessions.reduce((s, x) => s + x.total, 0);
+      const historySummaryText = `${filteredSessions.length}件 / 合計 ¥${historyTotal.toLocaleString()}`;
+      const historyListHTML = filteredSessions.length
+        ? filteredSessions.map(s => `
+            <div class="history-session">
+              <p class="history-date">📅 ${s.date}　<span style="color:var(--text-primary);font-weight:700;">${s.customerName}</span> 様</p>
+              <p class="history-items">${s.items.map(i => `${i.name}×${i.count}`).join('、')}</p>
+              <p class="history-total">合計 ¥${s.total.toLocaleString()}</p>
+            </div>`).join('')
+        : `<p style="color:var(--text-muted);text-align:center;padding:1rem 0;">${(historyFrom || historyTo) ? '該当する来店履歴がありません' : 'まだ来店履歴がありません'}</p>`;
+
       const menuRows = menu.map((m, index) => {
         const opts = [];
         if ((m.sizes || []).length > 0) opts.push('S/L');
@@ -640,6 +686,7 @@
       return `
         <div class="tabs">
           <button class="tab ${tab==='list'?'active':''}" data-tab="list">👥 一覧</button>
+          <button class="tab ${tab==='history'?'active':''}" data-tab="history">🕘 履歴</button>
           <button class="tab ${tab==='add'?'active':''}" data-tab="add">➕ 追加</button>
           <button class="tab ${tab==='menu'?'active':''}" data-tab="menu">🍹 メニュー</button>
           <button class="tab ${tab==='settings'?'active':''}" data-tab="settings">⚙️</button>
@@ -651,6 +698,22 @@
             ${searchDone ? `<button class="search-clear" id="search-clear">✕</button>` : ''}
           </div>
           <div id="customer-list-container"></div>
+        ` : tab === 'history' ? `
+          <div class="card">
+            <p class="section-title">来店履歴を日付で絞り込み</p>
+            <div class="search-wrap">
+              <input type="date" class="search-input" id="history-from" value="${historyFrom}" />
+              <input type="date" class="search-input" id="history-to" value="${historyTo}" />
+            </div>
+            <div class="search-wrap">
+              <button class="search-btn" id="history-search-btn" style="flex:1;">🔍 絞り込む</button>
+              ${(historyFrom || historyTo) ? `<button class="search-clear" id="history-clear-btn">✕ クリア</button>` : ''}
+            </div>
+          </div>
+          <div class="card">
+            <p class="section-title">${(historyFrom || historyTo) ? '絞り込み結果' : '全履歴（新しい順）'}　${historySummaryText}</p>
+            ${historyListHTML}
+          </div>
         ` : tab === 'add' ? `
           <div class="card">
             <p class="section-title">新しいお客様を追加（残高1200円でスタート）</p>
@@ -848,6 +911,16 @@
       }
       if (sc) sc.onclick = () => { searchQuery = ''; searchDone = false; render(); };
       if (tab === 'list') renderCustomerList();
+
+      // 履歴タブ：日付絞り込み・クリア
+      const hsBtn = document.getElementById('history-search-btn');
+      const hcBtn = document.getElementById('history-clear-btn');
+      if (hsBtn) hsBtn.onclick = () => {
+        historyFrom = document.getElementById('history-from').value;
+        historyTo = document.getElementById('history-to').value;
+        render();
+      };
+      if (hcBtn) hcBtn.onclick = () => { historyFrom = ''; historyTo = ''; render(); };
 
       const addBtn = document.getElementById('add-btn');
       if (addBtn) addBtn.onclick = () => {
