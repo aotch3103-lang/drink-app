@@ -448,6 +448,7 @@
     loadData();
 
     let view = 'list', selectedId = null, tab = 'list', searchQuery = '', searchDone = false, confirmCallback = null;
+    let menuSearchQuery = ''; // メニュー管理タブのドリンク名検索（ライブ絞り込み）
     let historyFrom = '', historyTo = ''; // 履歴タブの日付絞り込み（from/to）。タブを行き来しても値は保持される。
     let lastBackupAt = localStorage.getItem(STORAGE_KEY + '-last-backup') || ''; // 最終バックアップ日時（ページ再読込しても保持）
     let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
@@ -563,6 +564,53 @@
         </div>
         ${editRow}
       </div>`;
+    }
+
+    function renderMenuRows() {
+      const container = document.getElementById('menu-list-container');
+      if (!container) return;
+      const q = menuSearchQuery.replace(/\s/g, '');
+      const filtering = !!q;
+      const entries = menu
+        .map((m, index) => ({ m, index }))
+        .filter(({ m }) => !q || m.name.replace(/\s/g, '').includes(q));
+
+      if (!entries.length) {
+        container.innerHTML = `<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:8px 0;">${menu.length ? '該当するメニューがありません' : 'メニューがありません'}</p>`;
+        return;
+      }
+
+      container.innerHTML = entries.map(({ m, index }) => {
+        const opts = [];
+        if ((m.sizes || []).length > 0) opts.push('S/L');
+        if ((m.temps || []).length > 0) opts.push('HOT/ICE');
+        const optText = opts.length ? `<br><span style="font-size:11px;color:var(--text-muted);font-weight:500;">↳ ${opts.join('＋')}</span>` : '';
+        // 検索で絞り込み中は表示順が実際の並び順と異なるため、▲▼の並び替えは非表示にする
+        const sortActions = filtering ? '' : `
+          <div class="menu-sort-actions" style="margin-top:2px;">
+            <button class="btn-sort" onclick="moveMenu(${index},-1)" ${index===0?'disabled':''}>▲</button>
+            <button class="btn-sort" onclick="moveMenu(${index},1)" ${index===menu.length-1?'disabled':''}>▼</button>
+          </div>`;
+        return `<div class="menu-item-row" style="align-items:flex-start;">
+          ${sortActions}
+          <span class="menu-item-name" style="margin-left:4px;padding-top:6px;">${m.name}${optText}</span>
+          <div class="menu-price-edit-wrap" style="margin-top:2px;">
+            <input class="menu-price-edit-input" type="number" value="${m.price}" min="0" step="50" onchange="updateMenuPrice(${m.id},this.value)">
+            <span class="menu-price-edit-unit">円</span>
+          </div>
+          <button class="btn-menu-delete" data-menu-delete="${m.id}" style="margin-top:2px;">🗑</button>
+        </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-menu-delete]').forEach(el => {
+        el.onclick = () => {
+          const m = menu.find(x => x.id === parseInt(el.dataset.menuDelete));
+          showConfirm(`「${m.name}」を削除しますか？`, '削除する', () => {
+            menu = menu.filter(x => x.id !== m.id);
+            saveData(); showToast(`${m.name} を削除しました`); render();
+          });
+        };
+      });
     }
 
     function openDrinkPopup(itemId) {
@@ -794,24 +842,6 @@
 
       const lastBackupText = lastBackupAt ? `最終バックアップ：${lastBackupAt}` : '';
 
-      const menuRows = menu.map((m, index) => {
-        const opts = [];
-        if ((m.sizes || []).length > 0) opts.push('S/L');
-        if ((m.temps || []).length > 0) opts.push('HOT/ICE');
-        const optText = opts.length ? `<br><span style="font-size:11px;color:var(--text-muted);font-weight:500;">↳ ${opts.join('＋')}</span>` : '';
-        return `<div class="menu-item-row" style="align-items:flex-start;">
-          <div class="menu-sort-actions" style="margin-top:2px;">
-            <button class="btn-sort" onclick="moveMenu(${index},-1)" ${index===0?'disabled':''}>▲</button>
-            <button class="btn-sort" onclick="moveMenu(${index},1)" ${index===menu.length-1?'disabled':''}>▼</button>
-          </div>
-          <span class="menu-item-name" style="margin-left:4px;padding-top:6px;">${m.name}${optText}</span>
-          <div class="menu-price-edit-wrap" style="margin-top:2px;">
-            <input class="menu-price-edit-input" type="number" value="${m.price}" min="0" step="50" onchange="updateMenuPrice(${m.id},this.value)">
-            <span class="menu-price-edit-unit">円</span>
-          </div>
-          <button class="btn-menu-delete" data-menu-delete="${m.id}" style="margin-top:2px;">🗑</button>
-        </div>`;
-      }).join('');
 
       return `
         <div class="tabs">
@@ -860,7 +890,11 @@
           <div class="menu-manage-layout">
             <div class="card">
               <p class="section-title">現在のメニュー（${menu.length}品） ※▲▼で並び替え、価格は直接編集</p>
-              ${menu.length ? menuRows : '<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:8px 0;">メニューがありません</p>'}
+              <div class="search-wrap" style="margin-bottom:12px;">
+                <input class="search-input" id="menu-search-input" placeholder="🔍 ドリンク名で検索…" value="${menuSearchQuery}" inputmode="text" lang="ja" autocomplete="off" />
+                ${menuSearchQuery ? `<button class="search-clear" id="menu-search-clear">✕</button>` : ''}
+              </div>
+              <div id="menu-list-container"></div>
             </div>
             <div class="card">
               <p class="section-title">✨ 新しいメニューを追加</p>
@@ -1121,15 +1155,12 @@
         saveData(); showToast(`${name}（¥${price}）を追加しました`); render();
       };
 
-      document.querySelectorAll('[data-menu-delete]').forEach(el => {
-        el.onclick = () => {
-          const m = menu.find(x => x.id === parseInt(el.dataset.menuDelete));
-          showConfirm(`「${m.name}」を削除しますか？`, '削除する', () => {
-            menu = menu.filter(x => x.id !== m.id);
-            saveData(); showToast(`${m.name} を削除しました`); render();
-          });
-        };
-      });
+      // メニュー管理タブ：ドリンク名のライブ検索
+      const msi = document.getElementById('menu-search-input');
+      const msc = document.getElementById('menu-search-clear');
+      if (msi) msi.oninput = () => { menuSearchQuery = msi.value; renderMenuRows(); };
+      if (msc) msc.onclick = () => { menuSearchQuery = ''; render(); };
+      if (tab === 'menu') renderMenuRows();
 
       const back = document.getElementById('back-btn');
       if (back) back.onclick = () => { view = 'list'; render(); };
