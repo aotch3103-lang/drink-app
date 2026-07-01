@@ -29,27 +29,30 @@ const DEFAULT_MENU = [
   { id: 10, name: 'ノンアル',       price: 400, sizes: [{label:'S',priceDiff:0},{label:'L',priceDiff:100}], temps: ['HOT','ICE'] },
 ];
 
-/* ---------- 追加売上メニュー（コイン・貸卓・フード・教室） ----------
+/* ---------- 追加売上メニュー（ラビ・貸卓・フード・教室） ----------
    既存の menu（ドリンク引換券メニュー＝残高を消費するだけ）とは別物。
    こちらはタップした瞬間に「本日の売上」へ即計上される現金商品。
-   mode: 'tap'  → ボタン1回タップ＝1個購入（個数連打で積み上げ）
-   mode: 'time' → 分刻みのプリセットボタン（分数 ÷10 × ratePer10Min で計算） */
+   mode: 'tap'      → ボタン1回タップ＝1個購入（個数連打で積み上げ）
+   mode: 'time'      → 分刻みのプリセットボタン（分数 ÷10 × ratePer10Min で計算）
+   mode: 'fromMenu'  → items を持たず、既存のドリンク引換券メニュー（menu）を
+                        そのまま流用して表示する（品揃え・価格を二重管理しない） */
 const DEFAULT_EXTRA_MENU = [
   {
-    key: 'coin', label: '🪙 コイン販売', mode: 'tap',
-    items: [ { id: 'coin', name: 'コイン', price: 100 } ]
+    key: 'rabi', label: '🪙 ラビ販売', mode: 'tap',
+    items: [
+      { id: 'rabi_500',  name: 'ラビ 500円',   price: 500 },
+      { id: 'rabi_1000', name: 'ラビ 1,000円', price: 1000 },
+      { id: 'rabi_2000', name: 'ラビ 2,000円', price: 2000 },
+      { id: 'rabi_3000', name: 'ラビ 3,000円', price: 3000 },
+      { id: 'rabi_5000', name: 'ラビ 5,000円', price: 5000 }
+    ]
   },
   {
     key: 'table', label: '🀄 貸卓（時間課金）', shortLabel: '貸卓', mode: 'time',
-    ratePer10Min: 100, presetMinutes: [30, 60, 90, 120]
+    ratePer10Min: 100, presetMinutes: [30, 60, 90, 120] // ※時間計算方式は後日再検討予定の暫定仕様
   },
   {
-    key: 'drink', label: '🥤 ドリンク単品', mode: 'tap',
-    items: [
-      { id: 'drink_oolong', name: 'ウーロン茶', price: 200 },
-      { id: 'drink_cola',   name: 'コーラ',     price: 200 },
-      { id: 'drink_water',  name: 'お水',       price: 100 }
-    ]
+    key: 'drink', label: '🥤 ドリンク単品（ドリンク券メニューと共通）', mode: 'fromMenu'
   },
   {
     key: 'snack', label: '🍘 お菓子', mode: 'tap',
@@ -64,7 +67,7 @@ const DEFAULT_EXTRA_MENU = [
   },
   {
     key: 'lesson', label: '📚 麻雀教室（10分100円）', shortLabel: '麻雀教室', mode: 'time',
-    ratePer10Min: 100, presetMinutes: [10, 20, 30, 60]
+    ratePer10Min: 100, presetMinutes: [10, 20, 30, 60] // ※時間計算方式は後日再検討予定の暫定仕様
   }
 ];
 
@@ -117,7 +120,7 @@ function loadData() {
       extraMenu = DEFAULT_EXTRA_MENU.map(defCat => {
         const saved = data.extraMenu.find(x => x.key === defCat.key);
         if (!saved) return { ...defCat };
-        if (defCat.mode === 'time') return { ...defCat, ...saved };
+        if (defCat.mode === 'time' || defCat.mode === 'fromMenu') return { ...defCat, ...saved, mode: defCat.mode };
         return { ...defCat, ...saved, items: Array.isArray(saved.items) ? saved.items : defCat.items };
       });
     }
@@ -192,7 +195,7 @@ function getStoreTodayStats() {
 }
 
 /* ---------- 本日（営業日）分の「追加売上」集計 ----------
-   コイン／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室など、
+   ラビ／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室など、
    customer.extraSales に記録された現金売上を、ドリンク券の
    getTodayTicketStats と全く同じ「営業日」判定で集計する。 */
 function getTodayExtraStats(c) {
@@ -443,6 +446,59 @@ function moveMenu(index, direction) {
   saveData(); render();
 }
 
+/* ---------- お菓子・カップ麺（追加売上メニュー）の自由な追加・削除・価格編集 ----------
+   ラビ／貸卓／ドリンク単品／麻雀教室は固定の品揃え・計算方式のため対象外。
+   snack・noodle の2カテゴリだけ、既存の「メニュー管理」と同じ操作感で
+   品目を自由に増減できるようにする。 */
+const EXTRA_EDITABLE_CATEGORY_KEYS = ['snack', 'noodle'];
+
+function renderExtraMenuManageRows() {
+  const container = document.getElementById('extra-menu-list-container');
+  if (!container) return;
+  const editableCats = extraMenu.filter(c => EXTRA_EDITABLE_CATEGORY_KEYS.includes(c.key));
+  const rows = [];
+  editableCats.forEach(cat => {
+    (cat.items || []).forEach(item => rows.push({ cat, item }));
+  });
+  if (!rows.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:8px 0;">商品がありません</p>';
+    return;
+  }
+  container.innerHTML = rows.map(({ cat, item }) => {
+    const catShort = cat.label.replace(/^\S+\s/, '');
+    return `<div class="menu-item-row">
+      <span class="menu-item-name">${item.name}<br><span style="font-size:11px;color:var(--text-muted);font-weight:500;">↳ ${catShort}</span></span>
+      <div class="menu-price-edit-wrap">
+        <input class="menu-price-edit-input" type="number" value="${item.price}" min="0" step="50" onchange="updateExtraMenuPrice('${cat.key}','${item.id}',this.value)">
+        <span class="menu-price-edit-unit">円</span>
+      </div>
+      <button class="btn-menu-delete" data-extra-menu-delete="${cat.key}:${item.id}">🗑</button>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-extra-menu-delete]').forEach(el => {
+    el.onclick = () => {
+      const [catKey, itemId] = el.dataset.extraMenuDelete.split(':');
+      const cat = extraMenu.find(x => x.key === catKey);
+      const item = cat && (cat.items || []).find(i => i.id === itemId);
+      if (!cat || !item) return;
+      showConfirm(`「${item.name}」を削除しますか？`, '削除する', () => {
+        cat.items = cat.items.filter(i => i.id !== itemId);
+        saveData(); showToast(`${item.name} を削除しました`); render();
+      });
+    };
+  });
+}
+
+function updateExtraMenuPrice(catKey, itemId, newPrice) {
+  const price = parseInt(newPrice);
+  if (isNaN(price) || price < 0) { showToast('正しい金額を入力してください'); render(); return; }
+  if (price % 50 !== 0) { showToast('⚠️ 金額は50円単位で入力してください'); render(); return; }
+  const cat = extraMenu.find(c => c.key === catKey);
+  const item = cat && (cat.items || []).find(i => i.id === itemId);
+  if (item) { item.price = price; saveData(); showToast(`${item.name}の価格を¥${price}に変更しました`); }
+}
+
 /* ---------- ドリンク注文ポップアップ（サイズ・温度選択） ---------- */
 
 function openDrinkPopup(itemId) {
@@ -601,7 +657,7 @@ function attachTicketManageEvents() {
   };
 }
 
-/* ---------- 追加売上メニュー（コイン・貸卓・ドリンク単品・お菓子・カップ麺・麻雀教室） ----------
+/* ---------- 追加売上メニュー（ラビ・貸卓・ドリンク単品・お菓子・カップ麺・麻雀教室） ----------
    タップした瞬間に customer.extraSales へ1件記録＝即座に「本日売上」へ計上される。
    ドリンク引換券メニュー（menu／drink-card）とは完全に独立した仕組み。 */
 
@@ -617,6 +673,16 @@ function renderExtraMenuHTML() {
         </div>`;
       }).join('');
       return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns}</div>`;
+    }
+    if (cat.mode === 'fromMenu') {
+      // ドリンク単品は独自の品揃えを持たず、ドリンク券メニュー（menu）をそのまま表示する。
+      // メニュー管理タブで品目・価格を変更すれば、こちらにも自動的に反映される。
+      const btns = menu.map(item => `
+        <div class="drink-card" data-extra="${cat.key}:${item.id}">
+          <p class="drink-name">${item.name}</p>
+          <p class="drink-price">¥${item.price.toLocaleString()}</p>
+        </div>`).join('');
+      return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns || '<p style="color:var(--text-muted);font-size:13px;">メニューがありません</p>'}</div>`;
     }
     const btns = (cat.items || []).map(item => `
       <div class="drink-card" data-extra="${cat.key}:${item.id}">
@@ -647,14 +713,18 @@ function renderExtraSalesLogHTML(c) {
 }
 
 function attachExtraSalesEvents() {
-  // タップ即注文（コイン／ドリンク単品／お菓子／カップ麺）
+  // タップ即注文（ラビ／ドリンク単品／お菓子／カップ麺）
   document.querySelectorAll('[data-extra]').forEach(el => {
     el.onclick = () => {
       const [catKey, itemId] = el.dataset.extra.split(':');
       const cat = extraMenu.find(x => x.key === catKey);
-      const item = cat && (cat.items || []).find(i => i.id === itemId);
+      if (!cat) return;
+      // fromMenu（ドリンク単品）は menu 配列（id は数値）、それ以外は cat.items（id は文字列）から探す
+      const item = cat.mode === 'fromMenu'
+        ? menu.find(m => m.id === parseInt(itemId))
+        : (cat.items || []).find(i => i.id === itemId);
       const c = getCustomer(selectedId);
-      if (!cat || !item || !c) return;
+      if (!item || !c) return;
       if (!c.extraSales) c.extraSales = [];
       c.extraSales.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -825,6 +895,24 @@ function renderListView() {
             <button class="btn-menu-add" id="menu-add-btn">➕ メニューに登録する</button>
           </div>
         </div>
+        <div class="card">
+          <p class="section-title">🍘 お菓子・カップ麺（追加売上メニュー） ※価格は直接編集</p>
+          <div id="extra-menu-list-container"></div>
+        </div>
+        <div class="card">
+          <p class="section-title">✨ お菓子・カップ麺を追加</p>
+          <div class="menu-add-form">
+            <div class="menu-add-inputs">
+              <select id="extra-menu-category" style="height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:15px;background:var(--surface-1);color:var(--text-primary);outline:none;">
+                <option value="snack">🍘 お菓子</option>
+                <option value="noodle">🍜 カップ麺</option>
+              </select>
+              <input class="inp-name" type="text" id="extra-menu-name" placeholder="商品名（例：柿の種）" maxlength="15" inputmode="text" lang="ja" autocomplete="off" />
+              <input class="inp-price" type="number" id="extra-menu-price" placeholder="金額" min="0" max="9999" step="50" />
+            </div>
+            <button class="btn-menu-add" id="extra-menu-add-btn">➕ 追加する</button>
+          </div>
+        </div>
       </div>
     ` : `
       <div class="card">
@@ -923,7 +1011,7 @@ function renderOrderView() {
     ? `<p style="color:var(--text-muted);font-size:11px;text-align:center;margin:4px 0 0;">※前営業日以前の履歴 ${hiddenCount} 件は非表示（早朝5時で切替）</p>`
     : '';
 
-  // 本日の追加売上（コイン／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室）ログと合計
+  // 本日の追加売上（ラビ／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室）ログと合計
   const extraLog = renderExtraSalesLogHTML(c);
 
   const ticketBadge = c.tickets > 1 ? `<span class="tickets-badge">${c.tickets}枚所持</span>` : '';
@@ -1098,12 +1186,30 @@ function attachEvents() {
     saveData(); showToast(`${name}（¥${price}）を追加しました`); render();
   };
 
+  // お菓子・カップ麺（追加売上メニュー）の新規登録
+  const extraMenuAddBtn = document.getElementById('extra-menu-add-btn');
+  if (extraMenuAddBtn) extraMenuAddBtn.onclick = () => {
+    const catKey = document.getElementById('extra-menu-category').value;
+    const name = document.getElementById('extra-menu-name').value.trim();
+    const price = parseInt(document.getElementById('extra-menu-price').value);
+    if (!name || isNaN(price) || price < 0) { showToast('品名と金額を入力してください'); return; }
+    if (price % 50 !== 0) { showToast('⚠️ 金額は50円単位で入力してください'); return; }
+    const cat = extraMenu.find(c => c.key === catKey);
+    if (!cat) return;
+    if (!cat.items) cat.items = [];
+    const newId = `${catKey}_${Date.now()}`;
+    cat.items.push({ id: newId, name, price });
+    document.getElementById('extra-menu-name').value = '';
+    document.getElementById('extra-menu-price').value = '';
+    saveData(); showToast(`${name}（¥${price}）を追加しました`); render();
+  };
+
   // メニュー管理タブ：ドリンク名のライブ検索
   const msi = document.getElementById('menu-search-input');
   const msc = document.getElementById('menu-search-clear');
   if (msi) msi.oninput = () => { menuSearchQuery = msi.value; renderMenuRows(); };
   if (msc) msc.onclick = () => { menuSearchQuery = ''; render(); };
-  if (tab === 'menu') renderMenuRows();
+  if (tab === 'menu') { renderMenuRows(); renderExtraMenuManageRows(); }
 
   const back = document.getElementById('back-btn');
   if (back) back.onclick = () => { view = 'list'; render(); };
@@ -1161,7 +1267,7 @@ function attachEvents() {
     if (confirmCallback) { confirmCallback(); confirmCallback = null; }
   };
 
-  // 追加売上メニュー（コイン／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室）のボタン配線。
+  // 追加売上メニュー（ラビ／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室）のボタン配線。
   // 注文画面（view === 'order'）以外では該当要素が存在しないため何もしない（安全）。
   attachExtraSalesEvents();
 

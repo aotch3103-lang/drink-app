@@ -141,7 +141,7 @@ function importBackupFile(file) {
         extraMenu = DEFAULT_EXTRA_MENU.map(defCat => {
           const saved = data.extraMenu.find(x => x.key === defCat.key);
           if (!saved) return { ...defCat };
-          if (defCat.mode === 'time') return { ...defCat, ...saved };
+          if (defCat.mode === 'time' || defCat.mode === 'fromMenu') return { ...defCat, ...saved, mode: defCat.mode };
           return { ...defCat, ...saved, items: Array.isArray(saved.items) ? saved.items : defCat.items };
         });
       }
