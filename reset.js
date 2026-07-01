@@ -131,13 +131,16 @@ function importBackupFile(file) {
     catch (err) { showToast('⚠️ ファイルの読み込みに失敗しました'); return; }
     if (!data || !Array.isArray(data.customers)) { showToast('⚠️ バックアップファイルの形式が正しくありません'); return; }
     showConfirm('バックアップから復元しますか？\n現在のデータは上書きされます。', '復元する', () => {
-      customers = data.customers.map(c => ({
-        ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
-        ...c
-      }));
+      // app.js の migrateCustomer() と同じルールで移行する（二重管理を避けるため）。
+      // 万が一 app.js の読み込み順の都合で関数が無い場合だけ、最低限のフォールバックを使う。
+      customers = data.customers.map(c =>
+        typeof migrateCustomer === 'function'
+          ? migrateCustomer(c)
+          : { ticketNumbers: Array.isArray(c.ticketNumbers) ? c.ticketNumbers : [], ...c }
+      );
       if (Array.isArray(data.menu)) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
-      if (data.nextId) nextId = data.nextId;
-      if (data.nextMenuId) nextMenuId = data.nextMenuId;
+      if (Number.isFinite(data.nextId)) nextId = data.nextId;
+      if (Number.isFinite(data.nextMenuId)) nextMenuId = data.nextMenuId;
       saveData();
       showToast('📥 バックアップから復元しました');
       render();

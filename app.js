@@ -58,20 +58,63 @@ function saveData() {
   } catch(e) {}
 }
 
+/* ---------- 過去データの移行（マイグレーション） ---------- */
+// 「チケット№」機能が無かった頃のデータ（ticketNumbers/ticketSales/
+// totalPurchasedフィールドが存在しない）や、保存タイミングによっては
+// orders/sessionsが欠けている等、様々な「古い形」の顧客データを、
+// 現在のアプリが期待する形に安全に変換する。
+//
+// 大原則：
+//  ①「既にある値」は絶対に上書きしない（0枚や空配列も正当な値として尊重）
+//  ②「そもそもキー自体が無い」場合だけ、妥当な初期値で補う
+// この2つを守ることで、新機能追加のたびに古いお客様データが
+// 消えてしまう事故を防ぐ。
+function migrateCustomer(c) {
+  // tickets（所持枚数）：数値として存在すればそれを尊重。無ければ1。
+  const tickets = Number.isFinite(c.tickets) ? c.tickets : 1;
+
+  // ticketNumbers：配列として実在すれば（空配列 [] も含めて）そのまま尊重。
+  // キー自体が無い古いデータの時だけ、tickets枚数から連番(1,2,3…)を生成する。
+  const ticketNumbers = Array.isArray(c.ticketNumbers)
+    ? c.ticketNumbers
+    : Array.from({ length: Math.max(0, tickets) }, (_, i) => i + 1);
+
+  // ticketSales / orders / sessions：配列として実在すればそのまま尊重。
+  // 無ければ空配列で補うだけ（中身を推測して作り直したりはしない）。
+  const ticketSales = Array.isArray(c.ticketSales) ? c.ticketSales : [];
+  const orders = Array.isArray(c.orders) ? c.orders : [];
+  const sessions = Array.isArray(c.sessions) ? c.sessions : [];
+
+  // totalPurchased（累計購入枚数）：数値として存在すれば尊重。
+  // 無ければ「今の所持枚数を下回らない値」として ticketNumbers.length と
+  // tickets の大きい方を採用する。
+  const totalPurchased = Number.isFinite(c.totalPurchased)
+    ? c.totalPurchased
+    : Math.max(ticketNumbers.length, tickets);
+
+  return {
+    ...c,                 // まずは保存されていた全フィールドをそのまま引き継ぐ
+    tickets: Number.isFinite(c.tickets) ? c.tickets : ticketNumbers.length,
+    ticketNumbers,
+    ticketSales,
+    orders,
+    sessions,
+    totalPurchased,
+    editing: false        // 編集モードは保存前提のフィールドではないので常にリセット
+  };
+}
+
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const data = JSON.parse(raw);
-    if (data.customers) customers = data.customers.map(c => ({
-      ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
-      ticketSales: [],
-      totalPurchased: c.tickets || 1,
-      ...c
-    }));
-    if (data.menu) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
-    if (data.nextId) nextId = data.nextId;
-    if (data.nextMenuId) nextMenuId = data.nextMenuId;
+    if (Array.isArray(data.customers)) {
+      customers = data.customers.map(migrateCustomer);
+    }
+    if (Array.isArray(data.menu)) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
+    if (Number.isFinite(data.nextId)) nextId = data.nextId;
+    if (Number.isFinite(data.nextMenuId)) nextMenuId = data.nextMenuId;
     if (typeof data.totalSalesAmount === 'number') totalSalesAmount = data.totalSalesAmount;
     return true;
   } catch(e) { return false; }
@@ -872,7 +915,7 @@ function attachEvents() {
     const startInp = document.getElementById('new-start-ticket');
     let startNum = parseInt(startInp.value);
     if (isNaN(startNum) || startNum < 1) startNum = 1;
-    customers.push({ id: nextId++, name, balance: 1200, tickets: 1, ticketNumbers: [startNum], orders: [], sessions: [], editing: false });
+    customers.push({ id: nextId++, name, balance: 1200, tickets: 1, ticketNumbers: [startNum], ticketSales: [], totalPurchased: 1, orders: [], sessions: [], editing: false });
     inp.value = ''; startInp.value = '1'; tab = 'list'; searchQuery = ''; searchDone = false;
     saveData(); showToast(`${name} さんを追加しました（№${startNum}）`); render();
   };
