@@ -1,0 +1,321 @@
+/* ============================================================
+   style.css
+   「画面表示」担当ファイル。
+   ここを直せば、色・余白・フォント・レイアウトなど
+   見た目だけを、ロジックに触れずに変更できます。
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --pop-pink: #FF6B9D;
+  --pop-pink-light: #FFE0EE;
+  --pop-pink-dark: #C0396B;
+  --pop-purple: #A78BFA;
+  --pop-purple-light: #EDE9FE;
+  --pop-purple-dark: #6D28D9;
+  --pop-teal: #34D399;
+  --pop-teal-light: #D1FAE5;
+  --pop-teal-dark: #065F46;
+  --pop-orange: #FB923C;
+  --pop-orange-light: #FFEDD5;
+  --pop-orange-dark: #9A3412;
+  --pop-yellow: #FBBF24;
+  --pop-yellow-light: #FEF3C7;
+  --pop-sky: #38BDF8;
+  --pop-sky-light: #E0F2FE;
+  --pop-sky-dark: #0369A1;
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a6a;
+  --text-muted: #9090b0;
+  --surface-1: #FFF0F5;
+  --surface-2: #FFF8FB;
+  --border: #F8D0E4;
+  --border-strong: #F0A0C8;
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #F0EEFF;
+    --text-secondary: #B8B0D8;
+    --text-muted: #6860A0;
+    --surface-1: #1A1630;
+    --surface-2: #24203E;
+    --border: #322C54;
+    --border-strong: #4A4080;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page { padding: 14px; max-width: 1200px; margin: 0 auto; }
+
+/* ヘッダーロゴ風アクセント */
+.app-header {
+  text-align: center;
+  margin-bottom: 16px;
+  padding-top: 4px;
+}
+.app-header-title {
+  font-size: 20px;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--pop-pink), var(--pop-pink));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.02em;
+}
+
+.section-title { font-size: 11px; color: var(--text-muted); font-weight: 600; margin: 0 0 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* カード */
+.card {
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.1rem;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 12px rgba(167,139,250,0.07);
+}
+
+/* タブ */
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 5px; border: 1.5px solid var(--border); }
+.tab { flex: 1; padding: 9px 0; font-size: 12px; border: none; border-radius: var(--radius-pill); background: none; color: var(--text-secondary); cursor: pointer; text-align: center; font-weight: 500; transition: background 0.18s, color 0.18s; }
+.tab.active { background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; font-weight: 700; box-shadow: 0 2px 8px rgba(167,139,250,0.35); }
+
+/* 検索 */
+.search-wrap { display: flex; gap: 8px; margin-bottom: 12px; }
+.search-input { flex: 1; height: 44px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 16px; font-size: 16px; background: var(--surface-2); color: var(--text-primary); outline: none; }
+.search-input:focus { border-color: var(--pop-pink); box-shadow: 0 0 0 3px var(--pop-pink-light); }
+.search-btn { height: 44px; padding: 0 18px; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; font-size: 14px; font-weight: 600; box-shadow: 0 2px 8px rgba(167,139,250,0.3); white-space: nowrap; }
+.search-clear { height: 44px; padding: 0 14px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); background: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; }
+.search-hint { font-size: 13px; color: var(--text-muted); text-align: center; padding: 2rem 0 1rem; }
+
+/* 顧客カード */
+.customer-list { display: flex; flex-direction: column; gap: 10px; }
+.customer-item { background: var(--surface-2); border: 1.5px solid var(--border); border-radius: var(--radius-md); padding: 14px 14px; }
+.customer-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.customer-name { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.tickets-badge { font-size: 11px; background: var(--pop-pink-light); color: var(--pop-pink-dark); border-radius: var(--radius-pill); padding: 3px 9px; margin-left: 6px; font-weight: 600; }
+.balance-display { font-size: 16px; font-weight: 700; color: var(--pop-pink-dark); }
+.balance-display.low { color: var(--pop-orange-dark); }
+.balance-display.empty { color: var(--text-muted); }
+
+@media (prefers-color-scheme: dark) {
+  .balance-display { color: var(--pop-pink); }
+  .balance-display.low { color: var(--pop-orange); }
+  .tickets-badge { background: #0D3B2A; color: var(--pop-pink); }
+}
+
+.customer-item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ticket-nums { font-size: 12px; color: var(--text-secondary); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; margin-bottom: 10px; font-weight: 500; word-break: break-all; }
+
+/* ボタン共通 */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: var(--radius-pill); cursor: pointer; font-size: 13px; padding: 8px 14px; border: 1.5px solid var(--border); background: none; color: var(--text-primary); white-space: nowrap; min-height: 38px; font-weight: 500; transition: transform 0.1s, box-shadow 0.1s; }
+.btn:active { transform: scale(0.95); }
+.btn-order { border: none; background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; flex: 1; font-size: 14px; font-weight: 700; box-shadow: 0 2px 8px rgba(56,189,248,0.3); }
+.btn-ticket { border-color: var(--pop-pink); background: var(--pop-pink-light); color: var(--pop-pink-dark); font-weight: 600; }
+.btn-edit { border-color: var(--border-strong); color: var(--text-secondary); }
+.btn-delete { border-color: #FCA5A5; background: #FFF5F5; color: #DC2626; font-weight: 600; }
+.btn-reset { border-color: var(--pop-orange); background: var(--pop-orange-light); color: var(--pop-orange-dark); font-weight: 600; }
+
+@media (prefers-color-scheme: dark) {
+  .btn-ticket { background: #0D3B2A; color: var(--pop-pink); }
+  .btn-delete { background: #3B1515; color: #F87171; border-color: #7A2020; }
+  .btn-reset { background: #3B1E0D; color: var(--pop-orange); }
+}
+
+/* 残高編集 */
+.edit-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1.5px dashed var(--border); }
+.edit-bal-select { flex: 1; height: 44px; border: 1.5px solid var(--pop-pink); border-radius: var(--radius-pill); padding: 0 14px; font-size: 16px; background: var(--surface-2); color: var(--text-primary); outline: none; }
+.btn-save { height: 44px; padding: 0 18px; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; font-size: 14px; font-weight: 700; white-space: nowrap; }
+
+/* 新規追加フォーム */
+/* 検索画面ラッパー（PCで中央配置するためのフック） */
+.search-screen { width: 100%; }
+
+.add-form { display: flex; flex-direction: column; gap: 10px; }
+.add-form input[type=text], .add-form input[type=number] { width: 100%; height: 48px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 18px; font-size: 16px; background: var(--surface-2); color: var(--text-primary); outline: none; }
+.add-form input[type=text]:focus, .add-form input[type=number]:focus { border-color: var(--pop-pink); box-shadow: 0 0 0 3px var(--pop-pink-light); }
+.btn-add { width: 100%; height: 48px; font-size: 15px; font-weight: 700; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; box-shadow: 0 2px 10px rgba(52,211,153,0.3); }
+
+/* 注文画面 */
+.back-btn { font-size: 14px; color: var(--pop-pink-dark); background: var(--pop-pink-light); border: none; cursor: pointer; padding: 8px 16px; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; border-radius: var(--radius-pill); font-weight: 600; }
+@media (prefers-color-scheme: dark) { .back-btn { color: var(--pop-pink); background: #1E1840; } }
+
+.balance-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+.bal-big { font-size: 26px; font-weight: 800; color: var(--pop-pink-dark); white-space: nowrap; }
+.bal-big.low { color: var(--pop-orange-dark); }
+@media (prefers-color-scheme: dark) { .bal-big { color: var(--pop-pink); } .bal-big.low { color: var(--pop-orange); } }
+.prog-bg { flex: 1; background: var(--surface-1); border-radius: 99px; height: 10px; overflow: hidden; border: 1px solid var(--border); }
+.prog-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)); transition: width 0.3s; }
+.prog-fill.low { background: linear-gradient(90deg, var(--pop-orange), var(--pop-pink)); }
+
+/* ドリンクメニュー */
+.drink-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 1rem; }
+.drink-card { background: var(--surface-1); border: 1.5px solid var(--border); border-radius: var(--radius-md); padding: 14px 10px; cursor: pointer; text-align: center; user-select: none; transition: transform 0.12s, box-shadow 0.12s; }
+.drink-card:active { transform: scale(0.94); box-shadow: 0 4px 16px rgba(167,139,250,0.2); border-color: var(--pop-pink); }
+.drink-card.disabled { opacity: 0.3; pointer-events: none; }
+.drink-name { font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0 0 4px; }
+.drink-price { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; font-weight: 500; }
+.drink-count { display: inline-block; background: linear-gradient(135deg, var(--pop-pink-light), var(--pop-pink-light)); color: var(--pop-pink-dark); font-size: 12px; font-weight: 700; border-radius: var(--radius-pill); padding: 3px 12px; min-width: 30px; }
+@media (prefers-color-scheme: dark) { .drink-count { background: #2A1E4A; color: var(--pop-pink); } }
+
+/* アラート */
+.alert { background: var(--pop-orange-light); border: 1.5px solid var(--pop-orange); color: var(--pop-orange-dark); border-radius: var(--radius-md); padding: 10px 14px; font-size: 14px; margin-bottom: 10px; display: none; font-weight: 600; }
+
+/* 注文履歴 */
+.order-row { display: flex; justify-content: space-between; font-size: 14px; padding: 8px 0; border-bottom: 1.5px dashed var(--border); color: var(--text-primary); }
+.order-row:last-child { border-bottom: none; }
+.undo-btn { font-size: 13px; color: var(--pop-pink-dark); background: none; border: none; cursor: pointer; padding: 0; font-weight: 600; min-height: 36px; }
+@media (prefers-color-scheme: dark) { .undo-btn { color: var(--pop-pink); } }
+
+/* 来店履歴 */
+.history-session { background: var(--surface-1); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px; border: 1.5px solid var(--border); }
+.history-date { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; font-weight: 600; }
+.history-items { font-size: 13px; color: var(--text-primary); margin: 0 0 4px; }
+.history-total { font-size: 13px; font-weight: 700; color: var(--pop-pink-dark); margin: 0; }
+@media (prefers-color-scheme: dark) { .history-total { color: var(--pop-pink); } }
+
+/* メニュー管理 */
+.menu-item-row { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1.5px dashed var(--border); }
+.menu-item-row:last-child { border-bottom: none; }
+.menu-item-name { flex: 1; font-size: 15px; color: var(--text-primary); font-weight: 600; }
+.menu-sort-actions { display: flex; gap: 3px; }
+.btn-sort { width: 34px; height: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+.btn-sort:disabled { opacity: 0.2; cursor: not-allowed; }
+.menu-price-edit-wrap { display: flex; align-items: center; background: var(--surface-1); border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 10px; height: 40px; }
+.menu-price-edit-input { width: 65px; border: none; background: transparent; text-align: right; font-size: 15px; font-weight: 700; color: var(--text-primary); padding: 0; outline: none; }
+.menu-price-edit-unit { font-size: 13px; color: var(--text-secondary); margin-left: 2px; font-weight: 500; }
+.btn-menu-delete { padding: 6px 12px; border: 1.5px solid #FCA5A5; border-radius: var(--radius-pill); background: #FFF5F5; color: #DC2626; cursor: pointer; font-size: 14px; min-height: 38px; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .btn-menu-delete { background: #3B1515; color: #F87171; border-color: #7A2020; } }
+
+/* メニュー追加フォーム */
+.menu-add-form { display: flex; flex-direction: column; gap: 10px; }
+.menu-manage-layout { display: block; }
+.menu-add-inputs { display: flex; gap: 8px; }
+.inp-name { flex: 1; min-width: 100px; height: 44px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 14px; font-size: 15px; background: var(--surface-2); color: var(--text-primary); outline: none; }
+.inp-price { width: 90px; height: 44px; border: 1.5px solid var(--border); border-radius: var(--radius-pill); padding: 0 14px; font-size: 15px; background: var(--surface-2); color: var(--text-primary); outline: none; }
+.inp-name:focus, .inp-price:focus { border-color: var(--pop-pink); }
+.menu-add-options { display: flex; gap: 14px; padding: 4px 2px; font-size: 14px; color: var(--text-secondary); flex-wrap: wrap; }
+.menu-add-options label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 500; }
+.menu-add-options input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; accent-color: var(--pop-pink); }
+.btn-menu-add { height: 44px; width: 100%; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; font-size: 14px; font-weight: 700; box-shadow: 0 2px 8px rgba(167,139,250,0.3); }
+
+/* 確認ダイアログ */
+.confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(26,22,50,0.45); align-items: flex-end; justify-content: center; z-index: 100; }
+.confirm-overlay.show { display: flex; }
+.confirm-box { background: var(--surface-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1.5rem 1.25rem 2rem; width: 100%; max-width: 520px; border-top: 3px solid; border-image: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)) 1; }
+.confirm-box p { font-size: 16px; color: var(--text-primary); margin: 0 0 1.25rem; white-space: pre-wrap; font-weight: 500; }
+.confirm-actions { display: flex; flex-direction: column; gap: 8px; }
+.confirm-cancel { width: 100%; padding: 13px; font-size: 15px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-pill); background: none; color: var(--text-secondary); cursor: pointer; font-weight: 600; }
+.confirm-ok { width: 100%; padding: 13px; font-size: 15px; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), #E53E3E); color: #fff; cursor: pointer; font-weight: 700; box-shadow: 0 2px 8px rgba(255,107,157,0.35); }
+
+/* トースト */
+.toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: var(--surface-2); border: 1.5px solid var(--border-strong); border-radius: var(--radius-pill); padding: 11px 22px; font-size: 14px; color: var(--text-primary); display: none; white-space: nowrap; z-index: 99; box-shadow: 0 4px 20px rgba(167,139,250,0.2); font-weight: 600; }
+
+/* ドリンクオプション ポップアップ */
+.drink-popup-overlay { display: none; position: fixed; inset: 0; background: rgba(26,22,50,0.5); align-items: flex-end; justify-content: center; z-index: 110; }
+.drink-popup-overlay.show { display: flex; }
+.drink-popup { background: var(--surface-2); border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding: 1.5rem 1.25rem 2.5rem; width: 100%; max-width: 520px; border-top: 3px solid; border-image: linear-gradient(90deg, var(--pop-pink), var(--pop-pink)) 1; }
+.drink-popup-title { font-size: 20px; font-weight: 800; color: var(--text-primary); margin: 0 0 4px; text-align: center; }
+.drink-popup-base-price { font-size: 13px; color: var(--text-muted); text-align: center; margin: 0 0 20px; font-weight: 500; }
+.popup-section-label { font-size: 11px; color: var(--text-muted); font-weight: 700; margin: 0 0 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.popup-option-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.popup-option-btn { flex: 1; padding: 12px 8px; border: 1.5px solid var(--border); border-radius: var(--radius-md); background: var(--surface-1); color: var(--text-primary); font-size: 15px; cursor: pointer; text-align: center; transition: border-color 0.15s, background 0.15s; }
+.popup-option-btn .opt-label { display: block; font-weight: 700; }
+.popup-option-btn .opt-price { display: block; font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+.popup-option-btn.selected { border-color: var(--pop-pink); background: var(--pop-pink-light); color: var(--pop-pink-dark); box-shadow: 0 2px 8px rgba(167,139,250,0.25); }
+.popup-option-btn.selected .opt-price { color: var(--pop-pink-dark); }
+.popup-option-btn.hot.selected { border-color: var(--pop-orange); background: var(--pop-orange-light); color: var(--pop-orange-dark); }
+.popup-option-btn.ice.selected { border-color: var(--pop-pink); background: var(--pop-pink-light); color: var(--pop-pink-dark); }
+@media (prefers-color-scheme: dark) {
+  .popup-option-btn.selected { background: #2A1E4A; color: var(--pop-pink); }
+  .popup-option-btn.selected .opt-price { color: var(--pop-pink); }
+  .popup-option-btn.hot.selected { background: #3B1E0D; color: var(--pop-orange); }
+  .popup-option-btn.ice.selected { background: #0D2B3B; color: var(--pop-pink); }
+}
+.popup-total-price { font-size: 26px; font-weight: 800; color: var(--pop-pink-dark); text-align: center; margin: 6px 0 18px; }
+@media (prefers-color-scheme: dark) { .popup-total-price { color: var(--pop-pink); } }
+.popup-actions { display: flex; gap: 8px; }
+.popup-cancel-btn { flex: 1; padding: 13px; font-size: 15px; border: 1.5px solid var(--border-strong); border-radius: var(--radius-pill); background: none; color: var(--text-secondary); cursor: pointer; font-weight: 600; }
+.popup-order-btn { flex: 2; padding: 13px; font-size: 15px; border: none; border-radius: var(--radius-pill); background: linear-gradient(135deg, var(--pop-pink), var(--pop-pink)); color: #fff; cursor: pointer; font-weight: 700; box-shadow: 0 2px 10px rgba(56,189,248,0.3); }
+
+/* ━━━ PC専用レイアウト (900px以上) ━━━ */
+@media (min-width: 900px) {
+  .page { padding: 28px 40px; }
+
+  .app-header { text-align: left; display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .app-header-title { font-size: 24px; }
+
+  .tabs { max-width: 560px; }
+  .tab { font-size: 13px; padding: 9px 0; }
+
+  .customer-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+  .btn:hover { opacity: 0.82; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(167,139,250,0.2); }
+  .btn:active { transform: scale(0.97); }
+  .btn-order:hover { box-shadow: 0 4px 16px rgba(255,107,157,0.45); }
+  .drink-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(167,139,250,0.18); border-color: var(--pop-pink); }
+  .drink-card:active { transform: scale(0.96); }
+  .customer-item { transition: box-shadow 0.15s, transform 0.15s; }
+  .customer-item:hover { box-shadow: 0 4px 16px rgba(167,139,250,0.12); transform: translateY(-1px); }
+
+  .pc-order-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+  .pc-sidebar { position: sticky; top: 20px; }
+  .pc-sidebar-title { font-size: 11px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 10px; }
+  .pc-sidebar-list { display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 160px); overflow-y: auto; }
+  .pc-sidebar-item { padding: 10px 14px; border-radius: var(--radius-md); border: 1.5px solid var(--border); background: var(--surface-2); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-primary); transition: background 0.15s, border-color 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-sidebar-item:hover { background: var(--pop-pink-light); border-color: var(--pop-pink); }
+  .pc-sidebar-item.active { background: var(--pop-pink-light); border-color: var(--pop-pink); color: var(--pop-pink-dark); font-weight: 700; }
+  @media (prefers-color-scheme: dark) {
+    .pc-sidebar-item:hover, .pc-sidebar-item.active { background: #2A1E4A; border-color: var(--pop-pink); color: var(--pop-pink); }
+  }
+
+  .drink-grid { grid-template-columns: repeat(4, 1fr); }
+
+  .confirm-overlay { align-items: center; }
+  .confirm-box { border-radius: var(--radius-lg); border-top: none; border: 2px solid var(--pop-pink); box-shadow: 0 8px 40px rgba(167,139,250,0.25); }
+  .confirm-actions { flex-direction: row-reverse; gap: 10px; }
+  .confirm-ok, .confirm-cancel { flex: 1; }
+
+  .drink-popup-overlay { align-items: center; }
+  .drink-popup { border-radius: var(--radius-lg); border-top: none; border: 2px solid var(--pop-pink); box-shadow: 0 8px 40px rgba(167,139,250,0.25); }
+
+  .search-wrap { max-width: 560px; }
+
+  .search-screen:has(.search-hint) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 55vh;
+    text-align: center;
+  }
+  .search-screen:has(.search-hint) .search-wrap {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 0 4px;
+  }
+  .search-screen:has(.search-hint) .search-hint { padding: 1.5rem 0 0; }
+
+  .menu-manage-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
+  .menu-manage-layout .card { margin-bottom: 0; }
+
+  .btn { padding: 7px 13px; min-height: 34px; font-size: 13px; }
+  .btn-order { font-size: 14px; }
+  .search-input { height: 40px; font-size: 14px; }
+  .search-btn, .search-clear { height: 40px; }
+}
