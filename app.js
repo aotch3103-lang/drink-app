@@ -29,6 +29,45 @@ const DEFAULT_MENU = [
   { id: 10, name: 'ノンアル',       price: 400, sizes: [{label:'S',priceDiff:0},{label:'L',priceDiff:100}], temps: ['HOT','ICE'] },
 ];
 
+/* ---------- 追加売上メニュー（コイン・貸卓・フード・教室） ----------
+   既存の menu（ドリンク引換券メニュー＝残高を消費するだけ）とは別物。
+   こちらはタップした瞬間に「本日の売上」へ即計上される現金商品。
+   mode: 'tap'  → ボタン1回タップ＝1個購入（個数連打で積み上げ）
+   mode: 'time' → 分刻みのプリセットボタン（分数 ÷10 × ratePer10Min で計算） */
+const DEFAULT_EXTRA_MENU = [
+  {
+    key: 'coin', label: '🪙 コイン販売', mode: 'tap',
+    items: [ { id: 'coin', name: 'コイン', price: 100 } ]
+  },
+  {
+    key: 'table', label: '🀄 貸卓（時間課金）', shortLabel: '貸卓', mode: 'time',
+    ratePer10Min: 100, presetMinutes: [30, 60, 90, 120]
+  },
+  {
+    key: 'drink', label: '🥤 ドリンク単品', mode: 'tap',
+    items: [
+      { id: 'drink_oolong', name: 'ウーロン茶', price: 200 },
+      { id: 'drink_cola',   name: 'コーラ',     price: 200 },
+      { id: 'drink_water',  name: 'お水',       price: 100 }
+    ]
+  },
+  {
+    key: 'snack', label: '🍘 お菓子', mode: 'tap',
+    items: [
+      { id: 'snack_potechi', name: 'ポテトチップス', price: 200 },
+      { id: 'snack_kakipi',  name: '柿ピー',         price: 200 }
+    ]
+  },
+  {
+    key: 'noodle', label: '🍜 カップ麺', mode: 'tap',
+    items: [ { id: 'noodle', name: 'カップ麺', price: 400 } ]
+  },
+  {
+    key: 'lesson', label: '📚 麻雀教室（10分100円）', shortLabel: '麻雀教室', mode: 'time',
+    ratePer10Min: 100, presetMinutes: [10, 20, 30, 60]
+  }
+];
+
 const INITIAL_NAMES = [
   'お客様01','お客様02','お客様03','お客様04','お客様05','お客様06',
   'お客様07','お客様08','お客様09','お客様10','お客様11','お客様12',
@@ -42,7 +81,7 @@ const INITIAL_NAMES = [
 const DEFAULT_CUSTOMERS = INITIAL_NAMES.map((name, i) => ({
   id: i + 1, name, balance: 1200, tickets: 1, ticketNumbers: [1],
   ticketSales: [], totalPurchased: 1,
-  orders: [], sessions: [], editing: false
+  orders: [], sessions: [], extraSales: [], editing: false
 }));
 
 const BALANCE_OPTIONS = Array.from({ length: 121 }, (_, i) => i * 50);
@@ -53,55 +92,9 @@ function saveData() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       customers: customers.map(c => ({ ...c, editing: false })),
-      menu, nextId, nextMenuId, totalSalesAmount
+      menu, extraMenu, nextId, nextMenuId, totalSalesAmount
     }));
   } catch(e) {}
-}
-
-/* ---------- 過去データの移行（マイグレーション） ---------- */
-// 「チケット№」機能が無かった頃のデータ（ticketNumbers/ticketSales/
-// totalPurchasedフィールドが存在しない）や、保存タイミングによっては
-// orders/sessionsが欠けている等、様々な「古い形」の顧客データを、
-// 現在のアプリが期待する形に安全に変換する。
-//
-// 大原則：
-//  ①「既にある値」は絶対に上書きしない（0枚や空配列も正当な値として尊重）
-//  ②「そもそもキー自体が無い」場合だけ、妥当な初期値で補う
-// この2つを守ることで、新機能追加のたびに古いお客様データが
-// 消えてしまう事故を防ぐ。
-function migrateCustomer(c) {
-  // tickets（所持枚数）：数値として存在すればそれを尊重。無ければ1。
-  const tickets = Number.isFinite(c.tickets) ? c.tickets : 1;
-
-  // ticketNumbers：配列として実在すれば（空配列 [] も含めて）そのまま尊重。
-  // キー自体が無い古いデータの時だけ、tickets枚数から連番(1,2,3…)を生成する。
-  const ticketNumbers = Array.isArray(c.ticketNumbers)
-    ? c.ticketNumbers
-    : Array.from({ length: Math.max(0, tickets) }, (_, i) => i + 1);
-
-  // ticketSales / orders / sessions：配列として実在すればそのまま尊重。
-  // 無ければ空配列で補うだけ（中身を推測して作り直したりはしない）。
-  const ticketSales = Array.isArray(c.ticketSales) ? c.ticketSales : [];
-  const orders = Array.isArray(c.orders) ? c.orders : [];
-  const sessions = Array.isArray(c.sessions) ? c.sessions : [];
-
-  // totalPurchased（累計購入枚数）：数値として存在すれば尊重。
-  // 無ければ「今の所持枚数を下回らない値」として ticketNumbers.length と
-  // tickets の大きい方を採用する。
-  const totalPurchased = Number.isFinite(c.totalPurchased)
-    ? c.totalPurchased
-    : Math.max(ticketNumbers.length, tickets);
-
-  return {
-    ...c,                 // まずは保存されていた全フィールドをそのまま引き継ぐ
-    tickets: Number.isFinite(c.tickets) ? c.tickets : ticketNumbers.length,
-    ticketNumbers,
-    ticketSales,
-    orders,
-    sessions,
-    totalPurchased,
-    editing: false        // 編集モードは保存前提のフィールドではないので常にリセット
-  };
 }
 
 function loadData() {
@@ -109,18 +102,34 @@ function loadData() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return false;
     const data = JSON.parse(raw);
-    if (Array.isArray(data.customers)) {
-      customers = data.customers.map(migrateCustomer);
+    if (data.customers) customers = data.customers.map(c => ({
+      ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
+      ticketSales: [],
+      totalPurchased: c.tickets || 1,
+      extraSales: [], // 旧データ（追加売上機能実装前）を読み込んだ場合の初期値
+      ...c
+    }));
+    if (data.menu) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
+    // extraMenu は「カテゴリ構成」が変わる可能性があるため、保存データに
+    // 存在するカテゴリのみ価格・プリセットを上書きし、新規追加されたカテゴリ
+    // （アプリ更新で増えた項目）はデフォルトのまま維持する。
+    if (Array.isArray(data.extraMenu)) {
+      extraMenu = DEFAULT_EXTRA_MENU.map(defCat => {
+        const saved = data.extraMenu.find(x => x.key === defCat.key);
+        if (!saved) return { ...defCat };
+        if (defCat.mode === 'time') return { ...defCat, ...saved };
+        return { ...defCat, ...saved, items: Array.isArray(saved.items) ? saved.items : defCat.items };
+      });
     }
-    if (Array.isArray(data.menu)) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
-    if (Number.isFinite(data.nextId)) nextId = data.nextId;
-    if (Number.isFinite(data.nextMenuId)) nextMenuId = data.nextMenuId;
+    if (data.nextId) nextId = data.nextId;
+    if (data.nextMenuId) nextMenuId = data.nextMenuId;
     if (typeof data.totalSalesAmount === 'number') totalSalesAmount = data.totalSalesAmount;
     return true;
   } catch(e) { return false; }
 }
 
 let menu = DEFAULT_MENU.slice();
+let extraMenu = DEFAULT_EXTRA_MENU.map(cat => ({ ...cat, items: cat.items ? cat.items.map(i => ({ ...i })) : undefined }));
 let nextMenuId = 11;
 let customers = DEFAULT_CUSTOMERS.map(c => ({ ...c }));
 let nextId = customers.length + 1;
@@ -176,10 +185,47 @@ function getTodayTicketStats(c) {
 
 function getStoreTodayStats() {
   return customers.reduce((acc, c) => {
-    const s = getTodayTicketStats(c);
+    const s = getTodayTotalStats(c);
     acc.count += s.count; acc.total += s.total;
     return acc;
   }, { count: 0, total: 0 });
+}
+
+/* ---------- 本日（営業日）分の「追加売上」集計 ----------
+   コイン／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室など、
+   customer.extraSales に記録された現金売上を、ドリンク券の
+   getTodayTicketStats と全く同じ「営業日」判定で集計する。 */
+function getTodayExtraStats(c) {
+  const sales = (c.extraSales || []).filter(s =>
+    s.timestamp && getBusinessDateKey(s.timestamp) === CURRENT_BUSINESS_DATE
+  );
+  return {
+    count: sales.length,
+    total: sales.reduce((sum, s) => sum + (s.amount || 0), 0)
+  };
+}
+
+function getAllTimeExtraStats(c) {
+  const sales = c.extraSales || [];
+  return {
+    count: sales.length,
+    total: sales.reduce((sum, s) => sum + (s.amount || 0), 0)
+  };
+}
+
+/* ---------- 「ドリンク券売上」＋「追加売上」を合算した総合売上 ----------
+   顧客一覧・伝票画面の「本日売上」表示は、すべてこの関数経由にする。
+   ここを直せば一覧・伝票・店舗合計のすべてに反映される。 */
+function getTodayTotalStats(c) {
+  const t = getTodayTicketStats(c);
+  const e = getTodayExtraStats(c);
+  return { count: t.count + e.count, total: t.total + e.total };
+}
+
+function getAllTimeTotalStats(c) {
+  const t = getAllTimeTicketStats(c);
+  const e = getAllTimeExtraStats(c);
+  return { count: t.count + e.count, total: t.total + e.total };
 }
 
 /* ---------- 累計（全期間）の注文数・売上集計 ---------- */
@@ -259,7 +305,7 @@ function renderCustomerList() {
 
   // 現在表示されている検索結果（filtered）の合計売上・合計注文数をその場で集計
   const resultStats = filtered.reduce((acc, c) => {
-    const t = getAllTimeTicketStats(c);
+    const t = getAllTimeTotalStats(c);
     acc.count += t.count; acc.total += t.total;
     return acc;
   }, { count: 0, total: 0 });
@@ -292,15 +338,15 @@ function customerItemHTML(c) {
     ? `<div class="ticket-nums">✅ 有効№：${validNums.join(', ')}</div>`
     : '';
 
-  // 本日（営業日）分の注文数合計・売上合計
-  const stats = getTodayTicketStats(c);
+  // 本日（営業日）分の注文数合計・売上合計（ドリンク券販売＋追加売上メニューの合算）
+  const stats = getTodayTotalStats(c);
   const salesInfoRow = `<div class="sales-info-row">
       <span>📋 本日注文数：<strong>${stats.count}件</strong></span>
       <span>💰 本日売上：<strong>¥${stats.total.toLocaleString()}</strong></span>
     </div>`;
 
-  // 累計（全期間）の注文数合計・売上合計
-  const totalStats = getAllTimeTicketStats(c);
+  // 累計（全期間）の注文数合計・売上合計（ドリンク券販売＋追加売上メニューの合算）
+  const totalStats = getAllTimeTotalStats(c);
   const totalInfoRow = `<div class="sales-info-row total-row">
       <span>🗂 注文数合計：<strong>${totalStats.count}件</strong></span>
       <span>💴 売上合計：<strong>¥${totalStats.total.toLocaleString()}</strong></span>
@@ -555,6 +601,112 @@ function attachTicketManageEvents() {
   };
 }
 
+/* ---------- 追加売上メニュー（コイン・貸卓・ドリンク単品・お菓子・カップ麺・麻雀教室） ----------
+   タップした瞬間に customer.extraSales へ1件記録＝即座に「本日売上」へ計上される。
+   ドリンク引換券メニュー（menu／drink-card）とは完全に独立した仕組み。 */
+
+// カテゴリごとのボタン一覧HTML（tapモード＝商品ボタン、timeモード＝分数プリセットボタン）
+function renderExtraMenuHTML() {
+  return extraMenu.map(cat => {
+    if (cat.mode === 'time') {
+      const btns = (cat.presetMinutes || []).map(min => {
+        const amount = Math.round((min / 10) * cat.ratePer10Min);
+        return `<div class="drink-card" data-extra-time="${cat.key}:${min}">
+          <p class="drink-name">${min}分</p>
+          <p class="drink-price">¥${amount.toLocaleString()}</p>
+        </div>`;
+      }).join('');
+      return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns}</div>`;
+    }
+    const btns = (cat.items || []).map(item => `
+      <div class="drink-card" data-extra="${cat.key}:${item.id}">
+        <p class="drink-name">${item.name}</p>
+        <p class="drink-price">¥${item.price.toLocaleString()}</p>
+      </div>`).join('');
+    return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns}</div>`;
+  }).join('');
+}
+
+// 本日分の追加売上ログ（新しい順）＋各行の取消(✕)ボタン
+function renderExtraSalesLogHTML(c) {
+  const todayExtra = (c.extraSales || []).filter(s =>
+    !s.timestamp || getBusinessDateKey(s.timestamp) === CURRENT_BUSINESS_DATE
+  );
+  if (!todayExtra.length) {
+    return { rowsHTML: '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:6px 0;">まだ追加売上はありません</p>', total: 0 };
+  }
+  const rowsHTML = todayExtra.slice().reverse().map(s => `
+    <div class="order-row">
+      <span>${s.name}</span>
+      <span>¥${s.amount.toLocaleString()}
+        <button data-extra-delete="${s.id}" style="border:none;background:rgba(0,0,0,0.08);color:inherit;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:11px;line-height:1;margin-left:6px;">✕</button>
+      </span>
+    </div>`).join('');
+  const total = todayExtra.reduce((sum, s) => sum + s.amount, 0);
+  return { rowsHTML, total };
+}
+
+function attachExtraSalesEvents() {
+  // タップ即注文（コイン／ドリンク単品／お菓子／カップ麺）
+  document.querySelectorAll('[data-extra]').forEach(el => {
+    el.onclick = () => {
+      const [catKey, itemId] = el.dataset.extra.split(':');
+      const cat = extraMenu.find(x => x.key === catKey);
+      const item = cat && (cat.items || []).find(i => i.id === itemId);
+      const c = getCustomer(selectedId);
+      if (!cat || !item || !c) return;
+      if (!c.extraSales) c.extraSales = [];
+      c.extraSales.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        category: cat.key, itemId: item.id, name: item.name,
+        qty: 1, unit: null, unitPrice: item.price, amount: item.price,
+        timestamp: Date.now()
+      });
+      saveData();
+      showToast(`${item.name} を追加しました（+¥${item.price.toLocaleString()}）`);
+      render();
+    };
+  });
+
+  // 時間課金メニュー（貸卓／麻雀教室）
+  document.querySelectorAll('[data-extra-time]').forEach(el => {
+    el.onclick = () => {
+      const [catKey, minStr] = el.dataset.extraTime.split(':');
+      const minutes = parseInt(minStr);
+      const cat = extraMenu.find(x => x.key === catKey);
+      const c = getCustomer(selectedId);
+      if (!cat || !c || isNaN(minutes)) return;
+      const amount = Math.round((minutes / 10) * cat.ratePer10Min);
+      const catName = cat.shortLabel || cat.label.replace(/^\S+\s/, '');
+      if (!c.extraSales) c.extraSales = [];
+      c.extraSales.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        category: cat.key, itemId: `${catKey}_${minutes}`, name: `${catName}（${minutes}分）`,
+        qty: minutes, unit: '分', unitPrice: cat.ratePer10Min, amount,
+        timestamp: Date.now()
+      });
+      saveData();
+      showToast(`${catName} ${minutes}分を追加しました（+¥${amount.toLocaleString()}）`);
+      render();
+    };
+  });
+
+  // 追加売上1件の取消（✕ボタン）
+  document.querySelectorAll('[data-extra-delete]').forEach(el => {
+    el.onclick = () => {
+      const c = getCustomer(selectedId);
+      if (!c) return;
+      const targetId = el.dataset.extraDelete;
+      const target = (c.extraSales || []).find(s => String(s.id) === targetId);
+      if (!target) return;
+      showConfirm(`「${target.name}」（¥${target.amount.toLocaleString()}）を取り消しますか？`, '取り消す', () => {
+        c.extraSales = c.extraSales.filter(s => String(s.id) !== targetId);
+        saveData(); render();
+      });
+    };
+  });
+}
+
 /* ---------- 画面全体の描画 ---------- */
 
 function render() {
@@ -771,6 +923,9 @@ function renderOrderView() {
     ? `<p style="color:var(--text-muted);font-size:11px;text-align:center;margin:4px 0 0;">※前営業日以前の履歴 ${hiddenCount} 件は非表示（早朝5時で切替）</p>`
     : '';
 
+  // 本日の追加売上（コイン／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室）ログと合計
+  const extraLog = renderExtraSalesLogHTML(c);
+
   const ticketBadge = c.tickets > 1 ? `<span class="tickets-badge">${c.tickets}枚所持</span>` : '';
 
   // PC用サイドバー：全顧客の名前一覧（現在選択中をハイライト）
@@ -817,6 +972,15 @@ function renderOrderView() {
                  <button class="undo-btn" id="reset-orders-btn" style="color:var(--pop-orange);">🔄 全リセット</button>
                  <button class="undo-btn" id="save-session-btn" style="color:var(--pop-pink-dark);">✅ 来店確定</button>
                </div>`}
+        </div>
+        <div class="card">
+          <p class="section-title">追加売上メニュー（タップで即計上）</p>
+          ${renderExtraMenuHTML()}
+          <p class="section-title" style="margin-top:16px;">本日の追加売上</p>
+          ${extraLog.rowsHTML}
+          <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;padding-top:10px;color:var(--text-primary);">
+            <span>追加売上 合計</span><span>¥${extraLog.total.toLocaleString()}</span>
+          </div>
         </div>
         <div class="card">
           <p class="section-title">来店履歴（本日分）</p>
@@ -915,7 +1079,7 @@ function attachEvents() {
     const startInp = document.getElementById('new-start-ticket');
     let startNum = parseInt(startInp.value);
     if (isNaN(startNum) || startNum < 1) startNum = 1;
-    customers.push({ id: nextId++, name, balance: 1200, tickets: 1, ticketNumbers: [startNum], ticketSales: [], totalPurchased: 1, orders: [], sessions: [], editing: false });
+    customers.push({ id: nextId++, name, balance: 1200, tickets: 1, ticketNumbers: [startNum], orders: [], sessions: [], extraSales: [], editing: false });
     inp.value = ''; startInp.value = '1'; tab = 'list'; searchQuery = ''; searchDone = false;
     saveData(); showToast(`${name} さんを追加しました（№${startNum}）`); render();
   };
@@ -996,6 +1160,10 @@ function attachEvents() {
     document.getElementById('confirm-overlay').classList.remove('show');
     if (confirmCallback) { confirmCallback(); confirmCallback = null; }
   };
+
+  // 追加売上メニュー（コイン／貸卓／ドリンク単品／お菓子／カップ麺／麻雀教室）のボタン配線。
+  // 注文画面（view === 'order'）以外では該当要素が存在しないため何もしない（安全）。
+  attachExtraSalesEvents();
 
   // 「reset-orders-btn」「reset-all-customers-btn」「clear-storage-btn」
   // 「backup-export-btn」「backup-import-btn」の配線は reset.js の

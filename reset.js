@@ -69,8 +69,8 @@ document.addEventListener('visibilitychange', () => {
 function performSingleReset(id) {
   const c = getCustomer(id);
   if (!c) return;
-  showConfirm(`「${c.name}」さんの注文・残高・枚数を\n初期状態に戻しますか？`, '全リセットする', () => {
-    c.orders = []; c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1];
+  showConfirm(`「${c.name}」さんの注文・残高・枚数・追加売上を\n初期状態に戻しますか？`, '全リセットする', () => {
+    c.orders = []; c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1]; c.extraSales = [];
     saveData(); showToast(`${c.name} さんをリセットしました`); renderCustomerList();
   });
 }
@@ -88,7 +88,7 @@ function performCurrentOrderReset() {
 /* ---------- ⑤ 設定タブ：全員のデータをリセット ---------- */
 function performResetAllCustomers() {
   showConfirm('全員をリセットしますか？', 'リセット', () => {
-    customers.forEach(c => { c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1]; c.orders = []; c.sessions = []; c.editing = false; });
+    customers.forEach(c => { c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1]; c.orders = []; c.sessions = []; c.extraSales = []; c.editing = false; });
     saveData(); render();
   });
 }
@@ -105,7 +105,7 @@ function performClearStorage() {
 function exportBackup() {
   const data = {
     customers: customers.map(c => ({ ...c, editing: false })),
-    menu, nextId, nextMenuId,
+    menu, extraMenu, nextId, nextMenuId,
     exportedAt: nowStr()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -131,16 +131,22 @@ function importBackupFile(file) {
     catch (err) { showToast('⚠️ ファイルの読み込みに失敗しました'); return; }
     if (!data || !Array.isArray(data.customers)) { showToast('⚠️ バックアップファイルの形式が正しくありません'); return; }
     showConfirm('バックアップから復元しますか？\n現在のデータは上書きされます。', '復元する', () => {
-      // app.js の migrateCustomer() と同じルールで移行する（二重管理を避けるため）。
-      // 万が一 app.js の読み込み順の都合で関数が無い場合だけ、最低限のフォールバックを使う。
-      customers = data.customers.map(c =>
-        typeof migrateCustomer === 'function'
-          ? migrateCustomer(c)
-          : { ticketNumbers: Array.isArray(c.ticketNumbers) ? c.ticketNumbers : [], ...c }
-      );
+      customers = data.customers.map(c => ({
+        ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
+        extraSales: [],
+        ...c
+      }));
       if (Array.isArray(data.menu)) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
-      if (Number.isFinite(data.nextId)) nextId = data.nextId;
-      if (Number.isFinite(data.nextMenuId)) nextMenuId = data.nextMenuId;
+      if (Array.isArray(data.extraMenu)) {
+        extraMenu = DEFAULT_EXTRA_MENU.map(defCat => {
+          const saved = data.extraMenu.find(x => x.key === defCat.key);
+          if (!saved) return { ...defCat };
+          if (defCat.mode === 'time') return { ...defCat, ...saved };
+          return { ...defCat, ...saved, items: Array.isArray(saved.items) ? saved.items : defCat.items };
+        });
+      }
+      if (data.nextId) nextId = data.nextId;
+      if (data.nextMenuId) nextMenuId = data.nextMenuId;
       saveData();
       showToast('📥 バックアップから復元しました');
       render();
