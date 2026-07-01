@@ -142,8 +142,11 @@ function importBackupFile(file) {
           const saved = data.extraMenu.find(x => x.key === defCat.key);
           if (!saved) return { ...defCat };
           if (defCat.mode === 'time' || defCat.mode === 'fromMenu') return { ...defCat, ...saved, mode: defCat.mode };
-          // app.js の loadData() と同じロジック：保存済みの品目は維持しつつ、
-          // アプリ更新で増えた新しいデフォルト品目（例：「その他」）を補完する。
+          // app.js の loadData() と同じロジック：
+          // 「お菓子」「カップ麺」は自由編集＋新規デフォルト品目の補完、
+          // それ以外（ラビ等）の固定メニューは常に最新のデフォルト定義を使う。
+          const isEditableCat = defCat.key === 'snack' || defCat.key === 'noodle';
+          if (!isEditableCat) return { ...defCat };
           const savedItems = Array.isArray(saved.items) ? saved.items : defCat.items;
           const savedIds = new Set(savedItems.map(i => i.id));
           const missingDefaults = (defCat.items || []).filter(i => !savedIds.has(i.id));

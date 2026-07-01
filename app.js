@@ -40,11 +40,11 @@ const DEFAULT_EXTRA_MENU = [
   {
     key: 'rabi', label: '🪙 ラビ販売', mode: 'tap',
     items: [
-      { id: 'rabi_500',  name: 'ラビ 500円',   price: 500 },
-      { id: 'rabi_1000', name: 'ラビ 1,000円', price: 1000 },
-      { id: 'rabi_2000', name: 'ラビ 2,000円', price: 2000 },
-      { id: 'rabi_3000', name: 'ラビ 3,000円', price: 3000 },
-      { id: 'rabi_5000', name: 'ラビ 5,000円', price: 5000 }
+      { id: 'rabi_500',  name: '500ラビ',   price: 500,  priceLabel: '支払 ¥500' },
+      { id: 'rabi_1000', name: '1,000ラビ', price: 1000, priceLabel: '支払 ¥1,000' },
+      { id: 'rabi_2000', name: '2,000ラビ', price: 2000, priceLabel: '支払 ¥2,000' },
+      { id: 'rabi_3000', name: '3,300ラビ', price: 3000, priceLabel: '支払 ¥3,000（+300ボーナス）' },
+      { id: 'rabi_5000', name: '6,000ラビ', price: 5000, priceLabel: '支払 ¥5,000（+1,000ボーナス）' }
     ]
   },
   {
@@ -125,8 +125,12 @@ function loadData() {
         const saved = data.extraMenu.find(x => x.key === defCat.key);
         if (!saved) return { ...defCat };
         if (defCat.mode === 'time' || defCat.mode === 'fromMenu') return { ...defCat, ...saved, mode: defCat.mode };
-        // 保存データにある品目はそのまま維持しつつ、アプリ更新で新しく増えた
-        // デフォルト品目（例：「その他」）が保存データに無ければ追加する。
+        // 「お菓子」「カップ麺」はスタッフが品目・価格を自由に編集できる仕様のため、
+        // 保存データを尊重しつつ、アプリ更新で増えた新しいデフォルト品目だけを補完する。
+        // 「ラビ」など編集不可の固定メニューは、表示内容の更新（例：ラビ枚数表記の変更）が
+        // 常に反映されるよう、保存データに関わらず常に最新のデフォルト定義を使う。
+        const isEditableCat = defCat.key === 'snack' || defCat.key === 'noodle';
+        if (!isEditableCat) return { ...defCat };
         const savedItems = Array.isArray(saved.items) ? saved.items : defCat.items;
         const savedIds = new Set(savedItems.map(i => i.id));
         const missingDefaults = (defCat.items || []).filter(i => !savedIds.has(i.id));
@@ -735,7 +739,7 @@ function renderExtraMenuHTML() {
     const btns = (cat.items || []).map(item => `
       <div class="drink-card" data-extra="${cat.key}:${item.id}">
         <p class="drink-name">${item.name}</p>
-        <p class="drink-price">${item.isOther ? '金額を入力' : `¥${item.price.toLocaleString()}`}</p>
+        <p class="drink-price">${item.isOther ? '金額を入力' : (item.priceLabel || `¥${item.price.toLocaleString()}`)}</p>
       </div>`).join('');
     return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns}</div>`;
   }).join('');

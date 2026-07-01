@@ -3,14 +3,34 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🐰ドラパン🀄総合売上管理</title>
+  <title>ドラパン 総合売上管理</title>
   <!-- 画面表示（CSS）はすべて style.css に分離してあります -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="page">
     <div class="app-header">
-      <div class="app-header-title">🐰ドラパン🀄総合売上管理</div>
+      <div class="app-header-title">
+        <svg class="app-header-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M10 14 C8 6, 12 2, 14 4 C16 7, 15 13, 14 16 Z" fill="#FF6B9D"/>
+          <path d="M22 14 C24 6, 20 2, 18 4 C16 7, 17 13, 18 16 Z" fill="#FF6B9D"/>
+          <path d="M11 13 C10 8, 12.5 4.5, 13.5 5.5 C14.5 7.5, 14 12, 13.3 14 Z" fill="#FFE0EE"/>
+          <path d="M21 13 C22 8, 19.5 4.5, 18.5 5.5 C17.5 7.5, 18 12, 18.7 14 Z" fill="#FFE0EE"/>
+          <circle cx="16" cy="21" r="9" fill="#FFFDF8" stroke="#FF6B9D" stroke-width="1.4"/>
+          <circle cx="10.5" cy="23" r="1.6" fill="#FFC1DA"/>
+          <circle cx="21.5" cy="23" r="1.6" fill="#FFC1DA"/>
+          <circle cx="12.8" cy="20" r="1.3" fill="#1a1a2e"/>
+          <circle cx="19.2" cy="20" r="1.3" fill="#1a1a2e"/>
+          <path d="M16 22.3 L14.8 24 L17.2 24 Z" fill="#FF6B9D"/>
+        </svg>
+        <span>ドラパン</span>
+        <svg class="app-header-icon" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="4" y="3" width="24" height="26" rx="5" fill="#FFFDF8" stroke="#F0A0C8" stroke-width="1.6"/>
+          <rect x="4" y="3" width="24" height="7" rx="5" fill="#FFE0EE" opacity="0.7"/>
+          <text x="16" y="23" font-family="'Hiragino Sans','Hiragino Kaku Gothic ProN',sans-serif" font-size="15" font-weight="700" fill="#E5484D" text-anchor="middle">中</text>
+        </svg>
+        <span>総合売上管理</span>
+      </div>
     </div>
     <div id="app"></div>
     <div class="confirm-overlay" id="confirm-overlay">

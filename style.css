@@ -76,7 +76,11 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
   letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
 }
+.app-header-icon { width: 1.2em; height: 1.2em; flex-shrink: 0; vertical-align: middle; }
 
 .section-title { font-size: 11px; color: var(--text-muted); font-weight: 600; margin: 0 0 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 
