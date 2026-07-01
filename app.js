@@ -139,6 +139,18 @@ function getStoreTodayStats() {
   }, { count: 0, total: 0 });
 }
 
+/* ---------- 累計（全期間）の注文数・売上集計 ---------- */
+// getTodayTicketStats() が「本日分」だけを見るのに対し、こちらは日付で
+// 絞り込まず、そのお客様が今までに購入したチケット（ticketSales）を
+// すべて合計する。顧客一覧の「注文数合計」「売上合計」列で使用する。
+function getAllTimeTicketStats(c) {
+  const sales = c.ticketSales || [];
+  return {
+    count: sales.length,
+    total: sales.reduce((sum, s) => sum + (s.price || TICKET_SALE_PRICE), 0)
+  };
+}
+
 /* ---------- 履歴タブ用ヘルパー ---------- */
 // 全顧客のsessions（来店履歴）を1つの配列にまとめ、新しい順に並べる。
 // customers配列やsessions自体は変更しない（読み取り専用）。
@@ -226,7 +238,14 @@ function customerItemHTML(c) {
   const stats = getTodayTicketStats(c);
   const salesInfoRow = `<div class="sales-info-row">
       <span>📋 本日注文数：<strong>${stats.count}件</strong></span>
-      <span>💰 売上：<strong>¥${stats.total.toLocaleString()}</strong></span>
+      <span>💰 本日売上：<strong>¥${stats.total.toLocaleString()}</strong></span>
+    </div>`;
+
+  // 累計（全期間）の注文数合計・売上合計
+  const totalStats = getAllTimeTicketStats(c);
+  const totalInfoRow = `<div class="sales-info-row total-row">
+      <span>🗂 注文数合計：<strong>${totalStats.count}件</strong></span>
+      <span>💴 売上合計：<strong>¥${totalStats.total.toLocaleString()}</strong></span>
     </div>`;
 
   const editRow = c.editing ? `
@@ -243,6 +262,7 @@ function customerItemHTML(c) {
     </div>
     ${ticketNumsLine}
     ${salesInfoRow}
+    ${totalInfoRow}
     <div class="customer-item-actions">
       <button class="btn btn-order" data-order="${c.id}">🍹 注文</button>
       <button class="btn btn-ticket" data-addticket="${c.id}">🎫+1枚売る</button>
@@ -621,6 +641,7 @@ function renderOrderView() {
   if (!c) return '';
   const low = c.balance < 400;
   const pct = Math.min(100, Math.round((c.balance / (c.tickets * 1200)) * 100));
+  const validTicketCount = getValidTicketCount(c); // 残高から換算した「使える」チケット枚数
   const drinkCards = menu.map(item => {
     const cntAll = c.orders.filter(o => o.name === item.name || o.name.startsWith(item.name + '（')).length;
     const dis = item.price > c.balance;
@@ -684,6 +705,11 @@ function renderOrderView() {
         <div class="card">
           <p style="font-size:11px;color:var(--text-muted);margin:0 0 2px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">注文中</p>
           <p style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0 0 12px;">${c.name} 様 ${ticketBadge}</p>
+          <div class="ticket-hero-card">
+            <span class="ticket-hero-icon">🎫</span>
+            <span class="ticket-hero-number">${c.tickets}</span>
+            <span class="ticket-hero-text">枚 所持中${validTicketCount !== c.tickets ? `<br><span class="ticket-hero-sub">残高から使える有効枚数：${validTicketCount}枚</span>` : ''}</span>
+          </div>
           <div class="balance-bar">
             <span class="bal-big${low?' low':''}">残 ¥${c.balance.toLocaleString()}</span>
             <div class="prog-bg"><div class="prog-fill${low?' low':''}" style="width:${pct}%"></div></div>

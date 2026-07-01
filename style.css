@@ -122,6 +122,19 @@ body {
 .customer-item-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .ticket-nums { font-size: 12px; color: var(--text-secondary); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; margin-bottom: 10px; font-weight: 500; word-break: break-all; }
 
+/* 顧客カード内の「本日」「累計」注文数・売上サマリー行 */
+.sales-info-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-secondary); background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 6px; font-weight: 500; }
+.sales-info-row strong { color: var(--pop-pink-dark); font-weight: 700; }
+.sales-info-row.total-row { background: var(--pop-purple-light); border-color: var(--pop-purple); }
+.sales-info-row.total-row strong { color: var(--pop-purple-dark); }
+
+@media (prefers-color-scheme: dark) {
+  .sales-info-row { background: #1E1840; border-color: var(--border); }
+  .sales-info-row strong { color: var(--pop-pink); }
+  .sales-info-row.total-row { background: #2A1030; border-color: var(--pop-purple); }
+  .sales-info-row.total-row strong { color: var(--pop-purple); }
+}
+
 /* ボタン共通 */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: var(--radius-pill); cursor: pointer; font-size: 13px; padding: 8px 14px; border: 1.5px solid var(--border); background: none; color: var(--text-primary); white-space: nowrap; min-height: 38px; font-weight: 500; transition: transform 0.1s, box-shadow 0.1s; }
 .btn:active { transform: scale(0.95); }
@@ -154,6 +167,18 @@ body {
 /* 注文画面 */
 .back-btn { font-size: 14px; color: var(--pop-pink-dark); background: var(--pop-pink-light); border: none; cursor: pointer; padding: 8px 16px; margin-bottom: 14px; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; border-radius: var(--radius-pill); font-weight: 600; }
 @media (prefers-color-scheme: dark) { .back-btn { color: var(--pop-pink); background: #1E1840; } }
+
+/* 顧客詳細画面：現在のチケット枚数を大きく表示するヒーロー表示 */
+.ticket-hero-card { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, var(--pop-purple-light), var(--pop-pink-light)); border: 1.5px solid var(--pop-purple); border-radius: var(--radius-md); padding: 12px 18px; margin-bottom: 14px; }
+.ticket-hero-icon { font-size: 30px; line-height: 1; }
+.ticket-hero-number { font-size: 36px; font-weight: 800; color: var(--pop-purple-dark); line-height: 1; }
+.ticket-hero-text { font-size: 13px; font-weight: 700; color: var(--text-secondary); line-height: 1.5; }
+.ticket-hero-sub { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+
+@media (prefers-color-scheme: dark) {
+  .ticket-hero-card { background: linear-gradient(135deg, #2A1E4A, #2A1030); border-color: var(--pop-purple); }
+  .ticket-hero-number { color: var(--pop-purple); }
+}
 
 .balance-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
 .bal-big { font-size: 26px; font-weight: 800; color: var(--pop-pink-dark); white-space: nowrap; }
