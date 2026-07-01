@@ -5,11 +5,13 @@
    このファイルには以下だけが入っています：
    ① 早朝5時を境に「営業日」を切り替える表示ロジック
       （残高計算には一切影響しません。表示のみ）
-   ② お客様1人の注文・残高・チケットを初期状態に戻す
-   ③ 注文中の内容だけを取り消す
-   ④ 全員のデータを初期状態に戻す（全リセット）
-   ⑤ 保存データを完全に消去する
-   ⑥ データのバックアップ書き出し／復元
+   ② 営業日の自動ロールオーバー監視（ブラウザを開いたまま5時を
+      跨いだ場合に、自動で営業日を更新して再描画する）
+   ③ お客様1人の注文・残高・チケットを初期状態に戻す
+   ④ 注文中の内容だけを取り消す
+   ⑤ 全員のデータを初期状態に戻す（全リセット）
+   ⑥ 保存データを完全に消去する
+   ⑦ データのバックアップ書き出し／復元
 
    「リセット・初期化・バックアップまわりだけ直したい」時は
    このファイルだけを見れば完結するようにしてあります。
@@ -27,9 +29,43 @@ function getBusinessDateKey(d) {
   if (dt.getHours() < 5) dt.setDate(dt.getDate() - 1);
   return `${dt.getFullYear()}-${dt.getMonth()+1}-${dt.getDate()}`;
 }
-const CURRENT_BUSINESS_DATE = getBusinessDateKey(new Date());
+let CURRENT_BUSINESS_DATE = getBusinessDateKey(new Date());
 
-/* ---------- ② お客様1人分のリセット（🔄ボタン） ---------- */
+/* ---------- ② 営業日の自動ロールオーバー監視 ---------- */
+// ブラウザ／タブを開いたまま早朝5時をまたいだ場合、CURRENT_BUSINESS_DATE が
+// 更新されないままだと「本日分」の集計（getTodayTicketStats等）や
+// 履歴タブの表示が古い営業日のまま止まってしまう。
+// そこで「今の時刻から計算した営業日」と「今保持している営業日」を
+// 定期的に比較し、ズレていたら更新→再描画→トースト通知を行う。
+//
+// チェックのタイミングは2つ：
+//   1) setInterval による定期チェック（1分ごと）
+//   2) タブがフォーカス／表示状態に戻った瞬間
+//      （スマホでスリープ後に開いた時など、setIntervalがバックグラウンドで
+//       間引かれるケースをカバーするため）
+//
+// この処理は「表示上の営業日」を切り替えるだけで、残高・注文・
+// チケット枚数などのデータには一切手を加えない。
+function checkBusinessDateRollover() {
+  const latest = getBusinessDateKey(new Date());
+  if (latest === CURRENT_BUSINESS_DATE) return; // まだ切り替わっていない
+  CURRENT_BUSINESS_DATE = latest;
+  // 「本日分」集計・履歴の絞り込みは CURRENT_BUSINESS_DATE を参照している
+  // だけなので、再描画すれば自動的に新しい営業日の内容に切り替わる。
+  if (typeof render === 'function') render();
+  if (typeof showToast === 'function') showToast('🌅 営業日が更新されました');
+}
+
+// 1分ごとの定期チェック（5時ちょうどに厳密に反応する必要はないため）
+setInterval(checkBusinessDateRollover, 60 * 1000);
+// タブがフォーカスされた瞬間にも即座にチェック（PCブラウザ向け）
+window.addEventListener('focus', checkBusinessDateRollover);
+// スマホでスリープ復帰・タブ切替から戻った瞬間にも即座にチェック
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkBusinessDateRollover();
+});
+
+/* ---------- ③ お客様1人分のリセット（🔄ボタン） ---------- */
 function performSingleReset(id) {
   const c = getCustomer(id);
   if (!c) return;
@@ -39,7 +75,7 @@ function performSingleReset(id) {
   });
 }
 
-/* ---------- ③ 注文画面：今回の注文だけを取り消す ---------- */
+/* ---------- ④ 注文画面：今回の注文だけを取り消す ---------- */
 function performCurrentOrderReset() {
   const c = getCustomer(selectedId);
   if (!c) return;
@@ -49,7 +85,7 @@ function performCurrentOrderReset() {
   });
 }
 
-/* ---------- ④ 設定タブ：全員のデータをリセット ---------- */
+/* ---------- ⑤ 設定タブ：全員のデータをリセット ---------- */
 function performResetAllCustomers() {
   showConfirm('全員をリセットしますか？', 'リセット', () => {
     customers.forEach(c => { c.balance = 1200; c.tickets = 1; c.ticketNumbers = [1]; c.orders = []; c.sessions = []; c.editing = false; });
@@ -57,14 +93,14 @@ function performResetAllCustomers() {
   });
 }
 
-/* ---------- ⑤ 設定タブ：保存データを完全削除 ---------- */
+/* ---------- ⑥ 設定タブ：保存データを完全削除 ---------- */
 function performClearStorage() {
   showConfirm('データを全消去しますか？', '消去する', () => {
     localStorage.removeItem(STORAGE_KEY); location.reload();
   });
 }
 
-/* ---------- ⑥ バックアップ：書き出し・復元 ---------- */
+/* ---------- ⑦ バックアップ：書き出し・復元 ---------- */
 // 現在の全データ（customers, menu, nextId, nextMenuId）をJSONファイルとして書き出す。
 function exportBackup() {
   const data = {

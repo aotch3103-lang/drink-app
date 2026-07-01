@@ -211,8 +211,30 @@ body {
 .history-session { background: var(--surface-1); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 8px; border: 1.5px solid var(--border); }
 .history-date { font-size: 12px; color: var(--text-muted); margin: 0 0 4px; font-weight: 600; }
 .history-items { font-size: 13px; color: var(--text-primary); margin: 0 0 4px; }
+.history-ticket-nums { font-size: 12px; font-weight: 600; color: var(--pop-purple-dark); background: var(--pop-purple-light); display: inline-block; border-radius: var(--radius-sm); padding: 2px 9px; margin: 0 0 6px; }
 .history-total { font-size: 13px; font-weight: 700; color: var(--pop-pink-dark); margin: 0; }
-@media (prefers-color-scheme: dark) { .history-total { color: var(--pop-pink); } }
+@media (prefers-color-scheme: dark) {
+  .history-total { color: var(--pop-pink); }
+  .history-ticket-nums { color: var(--pop-purple); background: #2A1030; }
+}
+
+/* 履歴タブ：絞り込んだ期間の合計を画面上部に大きく表示するヒーロー行 */
+.stats-hero-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.stats-hero-box { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; background: linear-gradient(135deg, var(--pop-purple-light), var(--pop-pink-light)); border: 1.5px solid var(--pop-purple); border-radius: var(--radius-md); padding: 16px 10px; }
+.stats-hero-number { font-size: 26px; font-weight: 800; color: var(--pop-purple-dark); line-height: 1.1; white-space: nowrap; }
+.stats-hero-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+@media (prefers-color-scheme: dark) {
+  .stats-hero-box { background: linear-gradient(135deg, #2A1E4A, #2A1030); border-color: var(--pop-purple); }
+  .stats-hero-number { color: var(--pop-purple); }
+}
+
+/* 顧客一覧：現在の検索結果に対する合計売上サマリーバー */
+.search-result-summary { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); background: var(--surface-1); border: 1.5px dashed var(--pop-pink); border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 10px; }
+.search-result-summary strong { color: var(--pop-pink-dark); font-weight: 800; }
+@media (prefers-color-scheme: dark) {
+  .search-result-summary { background: #1E1840; }
+  .search-result-summary strong { color: var(--pop-pink); }
+}
 
 /* メニュー管理 */
 .menu-item-row { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1.5px dashed var(--border); }

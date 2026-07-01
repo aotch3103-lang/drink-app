@@ -213,9 +213,24 @@ function renderCustomerList() {
   }
   const q = searchQuery.replace(/\s/g,'');
   const filtered = q ? customers.filter(c => c.name.replace(/\s/g,'').includes(q)) : [];
-  container.innerHTML = filtered.length
+
+  // 現在表示されている検索結果（filtered）の合計売上・合計注文数をその場で集計
+  const resultStats = filtered.reduce((acc, c) => {
+    const t = getAllTimeTicketStats(c);
+    acc.count += t.count; acc.total += t.total;
+    return acc;
+  }, { count: 0, total: 0 });
+  const resultSummary = filtered.length
+    ? `<div class="search-result-summary">
+        <span>🔎 検索結果：<strong>${filtered.length}名</strong></span>
+        <span>📋 注文数合計：<strong>${resultStats.count}件</strong></span>
+        <span>💰 売上合計：<strong>¥${resultStats.total.toLocaleString()}</strong></span>
+      </div>`
+    : '';
+
+  container.innerHTML = resultSummary + (filtered.length
     ? filtered.map(c => customerItemHTML(c)).join('')
-    : '<p style="color:var(--text-muted);text-align:center;padding:1rem 0;">該当なし</p>';
+    : '<p style="color:var(--text-muted);text-align:center;padding:1rem 0;">該当なし</p>');
   attachCustomerEvents();
 }
 
@@ -512,14 +527,36 @@ function renderListView() {
   const allSessions = getAllSessions();
   const filteredSessions = filterSessionsByDate(allSessions, historyFrom, historyTo);
   const historyTotal = filteredSessions.reduce((s, x) => s + x.total, 0);
-  const historySummaryText = `${filteredSessions.length}件 / 合計 ¥${historyTotal.toLocaleString()}`;
+
+  // 絞り込んだ期間の「注文数合計」「売上合計」を画面上部に大きく表示するためのヒーロー行
+  const historyHeroRow = `
+    <div class="stats-hero-row">
+      <div class="stats-hero-box">
+        <span class="stats-hero-number">${filteredSessions.length}</span>
+        <span class="stats-hero-label">🍹 注文数合計（件）</span>
+      </div>
+      <div class="stats-hero-box">
+        <span class="stats-hero-number">¥${historyTotal.toLocaleString()}</span>
+        <span class="stats-hero-label">💰 売上合計</span>
+      </div>
+    </div>`;
+
   const historyListHTML = filteredSessions.length
-    ? filteredSessions.map(s => `
+    ? filteredSessions.map(s => {
+        // 来店確定（saveSession）時点でスナップショットした「有効チケット№」。
+        // 旧データ（この機能追加より前に保存されたセッション）には存在しないため、
+        // その場合は「記録なし」と表示する。
+        const ticketNumsText = (s.ticketNumbersAtSave && s.ticketNumbersAtSave.length)
+          ? s.ticketNumbersAtSave.join(', ')
+          : '記録なし（旧データ）';
+        return `
         <div class="history-session">
           <p class="history-date">📅 ${s.date}　<span style="color:var(--text-primary);font-weight:700;">${s.customerName}</span> 様</p>
           <p class="history-items">${s.items.map(i => `${i.name}×${i.count}`).join('、')}</p>
+          <p class="history-ticket-nums">🎫 使用チケット№：${ticketNumsText}</p>
           <p class="history-total">合計 ¥${s.total.toLocaleString()}</p>
-        </div>`).join('')
+        </div>`;
+      }).join('')
     : `<p style="color:var(--text-muted);text-align:center;padding:1rem 0;">${(historyFrom || historyTo) ? '該当する来店履歴がありません' : 'まだ来店履歴がありません'}</p>`;
 
   const lastBackupText = lastBackupAt ? `最終バックアップ：${lastBackupAt}` : '';
@@ -543,6 +580,7 @@ function renderListView() {
         <div id="customer-list-container"></div>
       </div>
     ` : tab === 'history' ? `
+      ${historyHeroRow}
       <div class="card">
         <p class="section-title">来店履歴を日付で絞り込み</p>
         <div class="search-wrap">
@@ -555,7 +593,7 @@ function renderListView() {
         </div>
       </div>
       <div class="card">
-        <p class="section-title">${(historyFrom || historyTo) ? '絞り込み結果' : '全履歴（新しい順）'}　${historySummaryText}</p>
+        <p class="section-title">${(historyFrom || historyTo) ? '絞り込み結果' : '全履歴（新しい順）'}</p>
         ${historyListHTML}
       </div>
     ` : tab === 'add' ? `
@@ -673,12 +711,18 @@ function renderOrderView() {
   const visibleSessions = c.sessions.filter(s => !s.timestamp || getBusinessDateKey(s.timestamp) === CURRENT_BUSINESS_DATE);
   const hiddenCount = c.sessions.length - visibleSessions.length;
   const sessionHistory = visibleSessions.length
-    ? visibleSessions.slice().reverse().map(s => `
+    ? visibleSessions.slice().reverse().map(s => {
+        const ticketNumsText = (s.ticketNumbersAtSave && s.ticketNumbersAtSave.length)
+          ? s.ticketNumbersAtSave.join(', ')
+          : '記録なし（旧データ）';
+        return `
         <div class="history-session">
           <p class="history-date">📅 ${s.date}</p>
           <p class="history-items">${s.items.map(i => `${i.name}×${i.count}`).join('、')}</p>
+          <p class="history-ticket-nums">🎫 使用チケット№：${ticketNumsText}</p>
           <p class="history-total">合計 ¥${s.total.toLocaleString()}</p>
-        </div>`).join('')
+        </div>`;
+      }).join('')
     : '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:6px 0;">来店履歴はありません</p>';
   const hiddenNote = hiddenCount > 0
     ? `<p style="color:var(--text-muted);font-size:11px;text-align:center;margin:4px 0 0;">※前営業日以前の履歴 ${hiddenCount} 件は非表示（早朝5時で切替）</p>`
@@ -894,7 +938,11 @@ function attachEvents() {
       grouped[key].count++;
     });
     const total = c.orders.reduce((s, o) => s + o.price, 0);
-    c.sessions.push({ date: nowStr(), timestamp: Date.now(), items: Object.values(grouped), total });
+    // 来店確定時点で残高的に「有効」なチケット№をスナップショットとして記録する。
+    // （どの1枚が実際に使われたかを厳密に追跡する仕組みは無いため、
+    //  「この来店の時点で使えていたチケット№」という位置づけの参考情報）
+    const ticketNumbersAtSave = getValidTicketNumbers(c);
+    c.sessions.push({ date: nowStr(), timestamp: Date.now(), items: Object.values(grouped), total, ticketNumbersAtSave });
     c.orders = []; saveData(); showToast('来店を確定しました'); render();
   };
 
