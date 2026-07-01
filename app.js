@@ -10,6 +10,12 @@
    ============================================================ */
 
 const STORAGE_KEY = 'drink-ticket-app-v1';
+
+// ドリンク券1枚あたりの「販売価格」（＝売上に計上される金額）と
+// 「利用価値」（＝購入時に残高へ加算される金額）。
+const TICKET_SALE_PRICE = 1000;
+const TICKET_VALUE = 1200;
+
 const DEFAULT_MENU = [
   { id: 1,  name: 'ビール',         price: 600, sizes: [], temps: [] },
   { id: 2,  name: '生ビール',       price: 700, sizes: [{label:'S',priceDiff:0},{label:'L',priceDiff:100}], temps: [] },
@@ -34,7 +40,9 @@ const INITIAL_NAMES = [
 ];
 
 const DEFAULT_CUSTOMERS = INITIAL_NAMES.map((name, i) => ({
-  id: i + 1, name, balance: 1200, tickets: 1, ticketNumbers: [1], orders: [], sessions: [], editing: false
+  id: i + 1, name, balance: 1200, tickets: 1, ticketNumbers: [1],
+  ticketSales: [], totalPurchased: 1,
+  orders: [], sessions: [], editing: false
 }));
 
 const BALANCE_OPTIONS = Array.from({ length: 121 }, (_, i) => i * 50);
@@ -45,7 +53,7 @@ function saveData() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       customers: customers.map(c => ({ ...c, editing: false })),
-      menu, nextId, nextMenuId
+      menu, nextId, nextMenuId, totalSalesAmount
     }));
   } catch(e) {}
 }
@@ -57,11 +65,14 @@ function loadData() {
     const data = JSON.parse(raw);
     if (data.customers) customers = data.customers.map(c => ({
       ticketNumbers: Array.from({ length: c.tickets || 1 }, (_, i) => i + 1),
+      ticketSales: [],
+      totalPurchased: c.tickets || 1,
       ...c
     }));
     if (data.menu) menu = data.menu.map(m => ({ sizes: [], temps: [], ...m }));
     if (data.nextId) nextId = data.nextId;
     if (data.nextMenuId) nextMenuId = data.nextMenuId;
+    if (typeof data.totalSalesAmount === 'number') totalSalesAmount = data.totalSalesAmount;
     return true;
   } catch(e) { return false; }
 }
@@ -70,6 +81,7 @@ let menu = DEFAULT_MENU.slice();
 let nextMenuId = 11;
 let customers = DEFAULT_CUSTOMERS.map(c => ({ ...c }));
 let nextId = customers.length + 1;
+let totalSalesAmount = 0; // ② 売上合計（円）。ドリンク券を1枚販売するたびに TICKET_SALE_PRICE(1,000円) が加算される。
 loadData();
 
 /* ---------- 画面状態（どのタブ・どの画面を表示中か） ---------- */
@@ -82,6 +94,50 @@ let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
 let manageTicketsId = null;
 
 function getCustomer(id) { return customers.find(c => c.id === id); }
+
+/* ---------- ① チケット枚数計算ロジック ---------- */
+// 1枚 = TICKET_VALUE（1,200円）分の価値。
+// 残高が1,200円増えるごとにチケットを1枚としてカウントする。
+// 例）残高1,200円 → 1枚　残高2,400円 → 2枚　残高1,200円未満 → 0枚
+function getValidTicketCount(c) {
+  return Math.floor((c.balance || 0) / TICKET_VALUE);
+}
+
+/* ---------- チケット番号の「有効な分だけ」表示ロジック ---------- */
+// 上のgetValidTicketCount()が返す枚数ぶんだけ、所持しているチケット№
+// （若い番号から）を「有効」として表示する。
+// ※これは「表示」だけのロジックで、チケット自体の所持数（tickets／
+//   ticketNumbers）や、累計購入枚数（totalPurchased）は変更しない。
+function getValidTicketNumbers(c) {
+  const validCount = getValidTicketCount(c);
+  if (validCount <= 0) return [];
+  const nums = (c.ticketNumbers || []).slice().sort((a, b) => a - b);
+  return nums.slice(0, Math.min(validCount, nums.length));
+}
+
+/* ---------- 本日（営業日）分の注文数・売上集計 ---------- */
+// ドリンク券が販売される度に c.ticketSales へ { number, timestamp, price } を
+// 記録している。ここでは reset.js の getBusinessDateKey / CURRENT_BUSINESS_DATE
+// （早朝5時で切り替わる「営業日」判定）を使って「本日分」だけを集計する。
+// 日付が変わればフィルタ結果が自動的に0件に戻るため、深夜0時ではなく
+// 早朝5時に自動でリセットされたのと同じ見え方になる。
+function getTodayTicketStats(c) {
+  const sales = (c.ticketSales || []).filter(s =>
+    s.timestamp && getBusinessDateKey(s.timestamp) === CURRENT_BUSINESS_DATE
+  );
+  return {
+    count: sales.length,
+    total: sales.reduce((sum, s) => sum + (s.price || TICKET_SALE_PRICE), 0)
+  };
+}
+
+function getStoreTodayStats() {
+  return customers.reduce((acc, c) => {
+    const s = getTodayTicketStats(c);
+    acc.count += s.count; acc.total += s.total;
+    return acc;
+  }, { count: 0, total: 0 });
+}
 
 /* ---------- 履歴タブ用ヘルパー ---------- */
 // 全顧客のsessions（来店履歴）を1つの配列にまとめ、新しい順に並べる。
@@ -155,11 +211,24 @@ function customerItemHTML(c) {
   const low = c.balance > 0 && c.balance < 400;
   const empty = c.balance === 0;
   const balClass = empty ? 'empty' : low ? 'low' : '';
-  const ticketBadge = c.tickets > 1 ? `<span class="tickets-badge">${c.tickets}枚</span>` : '';
-  const nums = (c.ticketNumbers || []).slice().sort((a,b) => a-b);
-  const ticketNumsLine = nums.length
-    ? `<div class="ticket-nums">№：${nums.join(', ')}</div>`
+
+  // 累計購入枚数（削除・並び替えをしても減らない、店員が「〇枚目」とコールするための数）
+  const totalPurchased = c.totalPurchased || c.tickets || 1;
+  const ticketBadge = `<span class="tickets-badge">累計${totalPurchased}枚</span>`;
+
+  // 残高に基づく「有効な」チケット№だけを表示（1,200円未満は非表示）
+  const validNums = getValidTicketNumbers(c);
+  const ticketNumsLine = validNums.length
+    ? `<div class="ticket-nums">✅ 有効№：${validNums.join(', ')}</div>`
     : '';
+
+  // 本日（営業日）分の注文数合計・売上合計
+  const stats = getTodayTicketStats(c);
+  const salesInfoRow = `<div class="sales-info-row">
+      <span>📋 本日注文数：<strong>${stats.count}件</strong></span>
+      <span>💰 売上：<strong>¥${stats.total.toLocaleString()}</strong></span>
+    </div>`;
+
   const editRow = c.editing ? `
     <div class="edit-row">
       <select class="edit-bal-select" data-id="${c.id}">
@@ -173,9 +242,10 @@ function customerItemHTML(c) {
       <span class="balance-display ${balClass}">¥${c.balance.toLocaleString()}</span>
     </div>
     ${ticketNumsLine}
+    ${salesInfoRow}
     <div class="customer-item-actions">
       <button class="btn btn-order" data-order="${c.id}">🍹 注文</button>
-      <button class="btn btn-ticket" data-addticket="${c.id}">+1枚</button>
+      <button class="btn btn-ticket" data-addticket="${c.id}">🎫+1枚売る</button>
       <button class="btn btn-edit" data-manage-tickets="${c.id}">🎫</button>
       <button class="btn btn-edit" data-edit="${c.id}">✏️</button>
       <button class="btn btn-reset" data-reset="${c.id}">🔄</button>
@@ -360,13 +430,21 @@ function renderTicketManage() {
   if (!c.ticketNumbers) c.ticketNumbers = [];
   document.getElementById('ticket-manage-name').textContent = `${c.name} 様のチケット№`;
   const nums = c.ticketNumbers.slice().sort((a,b) => a-b);
+  const validSet = new Set(getValidTicketNumbers(c));
   const listEl = document.getElementById('ticket-manage-list');
   listEl.innerHTML = nums.length
-    ? nums.map(n => `
-      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--pop-pink-light);color:var(--pop-pink-dark);border-radius:var(--radius-pill);padding:6px 8px 6px 14px;font-size:14px;font-weight:700;">
-        №${n}
-        <button data-del-ticket="${n}" style="border:none;background:rgba(0,0,0,0.08);color:inherit;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;">✕</button>
-      </span>`).join('')
+    ? nums.map(n => {
+        const valid = validSet.has(n);
+        const bg = valid ? 'var(--pop-pink-light)' : 'var(--surface-1)';
+        const fg = valid ? 'var(--pop-pink-dark)' : 'var(--text-muted)';
+        const border = valid ? 'none' : '1.5px dashed var(--border)';
+        const label = valid ? `№${n}` : `№${n}（残高不足）`;
+        return `
+          <span style="display:inline-flex;align-items:center;gap:6px;background:${bg};color:${fg};border:${border};border-radius:var(--radius-pill);padding:6px 8px 6px 14px;font-size:14px;font-weight:700;">
+            ${label}
+            <button data-del-ticket="${n}" style="border:none;background:rgba(0,0,0,0.08);color:inherit;width:20px;height:20px;border-radius:50%;cursor:pointer;font-size:12px;line-height:1;">✕</button>
+          </span>`;
+      }).join('')
     : '<p style="color:var(--text-muted);font-size:13px;">チケット№がありません</p>';
   const startInp = document.getElementById('ticket-renumber-start');
   startInp.value = nums.length ? nums[0] : 1;
@@ -647,10 +725,19 @@ function attachCustomerEvents() {
     el.onclick = () => {
       const c = getCustomer(parseInt(el.dataset.addticket));
       if (!c.ticketNumbers) c.ticketNumbers = [];
+      if (!c.ticketSales) c.ticketSales = [];
       const newNum = c.ticketNumbers.length ? Math.max(...c.ticketNumbers) + 1 : 1;
       c.ticketNumbers.push(newNum);
-      c.balance += 1200; c.tickets += 1;
-      saveData(); showToast(`${c.name} さんに№${newNum}を追加しました`); renderCustomerList();
+      c.balance += TICKET_VALUE;      // ① チケット1枚分の価値（1,200円）を残高に加算
+      c.tickets += 1;
+      c.totalPurchased = (c.totalPurchased || c.tickets - 1 || 0) + 1;
+      c.ticketSales.push({ number: newNum, timestamp: Date.now(), price: TICKET_SALE_PRICE });
+
+      totalSalesAmount += TICKET_SALE_PRICE; // ② 売上合計に販売価格（1,000円）を加算
+
+      saveData();
+      showToast(`${c.name} さんに№${newNum}を追加しました（売上 +¥${TICKET_SALE_PRICE.toLocaleString()}）`);
+      renderCustomerList();
     };
   });
   document.querySelectorAll('[data-manage-tickets]').forEach(el => {
