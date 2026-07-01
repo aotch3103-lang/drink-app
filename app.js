@@ -58,12 +58,16 @@ const DEFAULT_EXTRA_MENU = [
     key: 'snack', label: '🍘 お菓子', mode: 'tap',
     items: [
       { id: 'snack_potechi', name: 'ポテトチップス', price: 200 },
-      { id: 'snack_kakipi',  name: '柿ピー',         price: 200 }
+      { id: 'snack_kakipi',  name: '柿ピー',         price: 200 },
+      { id: 'snack_other',   name: 'その他',         price: 0, isOther: true }
     ]
   },
   {
     key: 'noodle', label: '🍜 カップ麺', mode: 'tap',
-    items: [ { id: 'noodle', name: 'カップ麺', price: 400 } ]
+    items: [
+      { id: 'noodle',       name: 'カップ麺', price: 400 },
+      { id: 'noodle_other', name: 'その他',   price: 0, isOther: true }
+    ]
   },
   {
     key: 'lesson', label: '📚 麻雀教室（10分100円）', shortLabel: '麻雀教室', mode: 'time',
@@ -121,7 +125,12 @@ function loadData() {
         const saved = data.extraMenu.find(x => x.key === defCat.key);
         if (!saved) return { ...defCat };
         if (defCat.mode === 'time' || defCat.mode === 'fromMenu') return { ...defCat, ...saved, mode: defCat.mode };
-        return { ...defCat, ...saved, items: Array.isArray(saved.items) ? saved.items : defCat.items };
+        // 保存データにある品目はそのまま維持しつつ、アプリ更新で新しく増えた
+        // デフォルト品目（例：「その他」）が保存データに無ければ追加する。
+        const savedItems = Array.isArray(saved.items) ? saved.items : defCat.items;
+        const savedIds = new Set(savedItems.map(i => i.id));
+        const missingDefaults = (defCat.items || []).filter(i => !savedIds.has(i.id));
+        return { ...defCat, ...saved, items: [...savedItems, ...missingDefaults] };
       });
     }
     if (data.nextId) nextId = data.nextId;
@@ -149,6 +158,41 @@ let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
 let manageTicketsId = null;
 
 function getCustomer(id) { return customers.find(c => c.id === id); }
+
+/* ---------- カフェ用ダミー伝票（お名前が分からないお客様向け） ----------
+   麻雀のお客様と違い、カフェのお客様はお名前が分からないことが多い。
+   名前入力なしでワンタップで伝票（顧客）を作成し、そのまま注文画面を開く。
+   isDummy: true を付けておくことで、後から本名が分かった際に
+   performRenameCustomer() でいつでも名前を設定し直せるようにする。 */
+function performCreateDummyTicket() {
+  const id = nextId++;
+  const name = `☕匿名${id}`;
+  customers.push({
+    id, name, balance: 1200, tickets: 1, ticketNumbers: [1],
+    ticketSales: [], totalPurchased: 1,
+    orders: [], sessions: [], extraSales: [], editing: false,
+    isDummy: true
+  });
+  saveData();
+  selectedId = id; view = 'order';
+  showToast(`${name} の伝票を作成しました`);
+  render();
+}
+
+// お客様の名前を後から設定・変更する（ダミー伝票 → 本名が分かった時などに使用）。
+function performRenameCustomer(id) {
+  const c = getCustomer(id);
+  if (!c) return;
+  const input = window.prompt('お名前を入力してください', c.isDummy ? '' : c.name);
+  if (input === null) return; // キャンセル
+  const trimmed = input.trim();
+  if (!trimmed) { showToast('お名前を入力してください'); return; }
+  c.name = trimmed;
+  c.isDummy = false;
+  saveData();
+  showToast('お名前を更新しました');
+  render();
+}
 
 /* ---------- ① チケット枚数計算ロジック ---------- */
 // 1枚 = TICKET_VALUE（1,200円）分の価値。
@@ -362,9 +406,11 @@ function customerItemHTML(c) {
       </select>
       <button class="btn-save" data-save="${c.id}">保存</button>
     </div>` : '';
+  // ダミー伝票（カフェ等、来店時にお名前が分からないお客様）には目印バッジを付ける
+  const dummyBadge = c.isDummy ? `<span class="tickets-badge" style="background:var(--pop-sky-light);color:var(--pop-sky-dark);">☕ 名前未設定</span>` : '';
   return `<div class="customer-item">
     <div class="customer-item-top">
-      <span class="customer-name">${c.name}${ticketBadge}</span>
+      <span class="customer-name">${c.name}${ticketBadge}${dummyBadge}</span>
       <span class="balance-display ${balClass}">¥${c.balance.toLocaleString()}</span>
     </div>
     ${ticketNumsLine}
@@ -375,6 +421,7 @@ function customerItemHTML(c) {
       <button class="btn btn-ticket" data-addticket="${c.id}">🎫+1枚売る</button>
       <button class="btn btn-edit" data-manage-tickets="${c.id}">🎫</button>
       <button class="btn btn-edit" data-edit="${c.id}">✏️</button>
+      <button class="btn btn-edit" data-rename="${c.id}">📝名前</button>
       <button class="btn btn-reset" data-reset="${c.id}">🔄</button>
       <button class="btn btn-delete" data-delete="${c.id}">🗑</button>
     </div>
@@ -458,7 +505,8 @@ function renderExtraMenuManageRows() {
   const editableCats = extraMenu.filter(c => EXTRA_EDITABLE_CATEGORY_KEYS.includes(c.key));
   const rows = [];
   editableCats.forEach(cat => {
-    (cat.items || []).forEach(item => rows.push({ cat, item }));
+    // 「その他」はタップの都度金額を入力する仕組みのため、固定価格編集の対象外とする。
+    (cat.items || []).filter(item => !item.isOther).forEach(item => rows.push({ cat, item }));
   });
   if (!rows.length) {
     container.innerHTML = '<p style="color:var(--text-muted);font-size:14px;text-align:center;padding:8px 0;">商品がありません</p>';
@@ -687,7 +735,7 @@ function renderExtraMenuHTML() {
     const btns = (cat.items || []).map(item => `
       <div class="drink-card" data-extra="${cat.key}:${item.id}">
         <p class="drink-name">${item.name}</p>
-        <p class="drink-price">¥${item.price.toLocaleString()}</p>
+        <p class="drink-price">${item.isOther ? '金額を入力' : `¥${item.price.toLocaleString()}`}</p>
       </div>`).join('');
     return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns}</div>`;
   }).join('');
@@ -726,6 +774,25 @@ function attachExtraSalesEvents() {
       const c = getCustomer(selectedId);
       if (!item || !c) return;
       if (!c.extraSales) c.extraSales = [];
+
+      // 「その他」項目は固定金額を持たないため、タップ時にその場で金額を入力してもらう。
+      if (item.isOther) {
+        const amountStr = window.prompt(`${cat.label.replace(/^\S+\s/, '')}「その他」の金額を入力してください（円）`, '');
+        if (amountStr === null) return; // キャンセル
+        const amount = parseInt(amountStr, 10);
+        if (isNaN(amount) || amount <= 0) { showToast('⚠️ 正しい金額を入力してください'); return; }
+        c.extraSales.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          category: cat.key, itemId: item.id, name: item.name,
+          qty: 1, unit: null, unitPrice: amount, amount,
+          timestamp: Date.now()
+        });
+        saveData();
+        showToast(`${item.name} を追加しました（+¥${amount.toLocaleString()}）`);
+        render();
+        return;
+      }
+
       c.extraSales.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         category: cat.key, itemId: item.id, name: item.name,
@@ -870,6 +937,11 @@ function renderListView() {
           <input type="number" id="new-start-ticket" placeholder="開始チケット№（初期値：1）" min="1" value="1" />
           <button class="btn-add" id="add-btn">✨ 追加する</button>
         </div>
+      </div>
+      <div class="card">
+        <p class="section-title">☕ カフェのお客様（お名前が分からない場合）</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;">名前入力なしでダミー伝票を作成し、そのまま注文画面を開きます。お名前が分かったら伝票画面の「✏️ 名前変更」からいつでも設定できます。</p>
+        <button class="btn-add" id="add-dummy-btn" style="background:linear-gradient(135deg, var(--pop-sky), var(--pop-sky));">☕ ダミー伝票を作成する</button>
       </div>
     ` : tab === 'menu' ? `
       <div class="menu-manage-layout">
@@ -1019,8 +1091,8 @@ function renderOrderView() {
   // PC用サイドバー：全顧客の名前一覧（現在選択中をハイライト）
   const sidebarItems = customers.map(cu =>
     `<div class="pc-sidebar-item${cu.id === c.id ? ' active' : ''}" data-order="${cu.id}">
-      ${cu.name}
-      <span style="float:right;font-size:11px;color:var(--text-muted);">¥${cu.balance.toLocaleString()}</span>
+      <span class="pc-sidebar-item-name">${cu.name}</span>
+      <span class="pc-sidebar-item-balance">¥${cu.balance.toLocaleString()}</span>
     </div>`
   ).join('');
 
@@ -1034,7 +1106,10 @@ function renderOrderView() {
       <div class="pc-main">
         <div class="card">
           <p style="font-size:11px;color:var(--text-muted);margin:0 0 2px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">注文中</p>
-          <p style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0 0 12px;">${c.name} 様 ${ticketBadge}</p>
+          <p style="font-size:20px;font-weight:700;color:var(--text-primary);margin:0 0 12px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+            <span>${c.name} 様 ${ticketBadge}</span>
+            <button data-rename="${c.id}" style="font-size:12px;font-weight:600;border:1.5px solid var(--border);border-radius:var(--radius-pill);background:var(--surface-1);color:var(--text-secondary);padding:4px 10px;cursor:pointer;">✏️ 名前変更</button>
+          </p>
           <div class="ticket-hero-card">
             <span class="ticket-hero-icon">🎫</span>
             <span class="ticket-hero-number">${c.tickets}</span>
@@ -1115,6 +1190,9 @@ function attachCustomerEvents() {
       renderCustomerList();
     };
   });
+  document.querySelectorAll('[data-rename]').forEach(el => {
+    el.onclick = () => performRenameCustomer(parseInt(el.dataset.rename));
+  });
   document.querySelectorAll('[data-save]').forEach(el => {
     el.onclick = () => {
       const c = getCustomer(parseInt(el.dataset.save));
@@ -1172,6 +1250,9 @@ function attachEvents() {
     saveData(); showToast(`${name} さんを追加しました（№${startNum}）`); render();
   };
 
+  const addDummyBtn = document.getElementById('add-dummy-btn');
+  if (addDummyBtn) addDummyBtn.onclick = performCreateDummyTicket;
+
   const menuAddBtn = document.getElementById('menu-add-btn');
   if (menuAddBtn) menuAddBtn.onclick = () => {
     const name = document.getElementById('menu-name').value.trim();
@@ -1213,6 +1294,10 @@ function attachEvents() {
 
   const back = document.getElementById('back-btn');
   if (back) back.onclick = () => { view = 'list'; render(); };
+
+  document.querySelectorAll('[data-rename]').forEach(el => {
+    el.onclick = () => performRenameCustomer(parseInt(el.dataset.rename));
+  });
 
   document.querySelectorAll('[data-drink]').forEach(el => {
     el.onclick = () => {
