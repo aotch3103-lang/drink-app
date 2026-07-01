@@ -1295,6 +1295,14 @@ function attachEvents() {
   const back = document.getElementById('back-btn');
   if (back) back.onclick = () => { view = 'list'; render(); };
 
+  // PC用サイドバー（注文画面左側の顧客一覧）の顧客切り替え。
+  // customer-list-container 内のカード（🍹注文ボタン等）は attachCustomerEvents() 側で
+  // 配線されるが、サイドバーは renderCustomerList() を経由しない別要素のため、
+  // ここで改めて [data-order] を配線しておく（配線漏れ防止のため二重に配線しても害はない）。
+  document.querySelectorAll('[data-order]').forEach(el => {
+    el.onclick = () => { selectedId = parseInt(el.dataset.order); view = 'order'; render(); };
+  });
+
   document.querySelectorAll('[data-rename]').forEach(el => {
     el.onclick = () => performRenameCustomer(parseInt(el.dataset.rename));
   });
