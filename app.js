@@ -44,7 +44,8 @@ const DEFAULT_EXTRA_MENU = [
       { id: 'rabi_1000', name: '1,000ラビ', price: 1000, priceLabel: '支払 ¥1,000' },
       { id: 'rabi_2000', name: '2,000ラビ', price: 2000, priceLabel: '支払 ¥2,000' },
       { id: 'rabi_3000', name: '3,300ラビ', price: 3000, priceLabel: '支払 ¥3,000（+300ボーナス）' },
-      { id: 'rabi_5000', name: '6,000ラビ', price: 5000, priceLabel: '支払 ¥5,000（+1,000ボーナス）' }
+      { id: 'rabi_5000', name: '6,000ラビ', price: 5000, priceLabel: '支払 ¥5,000（+1,000ボーナス）' },
+      { id: 'rabi_other', name: 'その他',   price: 0, isOther: true }
     ]
   },
   {
@@ -736,11 +737,16 @@ function renderExtraMenuHTML() {
         </div>`).join('');
       return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns || '<p style="color:var(--text-muted);font-size:13px;">メニューがありません</p>'}</div>`;
     }
-    const btns = (cat.items || []).map(item => `
+    const btns = (cat.items || []).map(item => {
+      const priceLine = item.isOther
+        ? (cat.key === 'rabi' ? '金額・枚数を入力' : '金額を入力')
+        : (item.priceLabel || `¥${item.price.toLocaleString()}`);
+      return `
       <div class="drink-card" data-extra="${cat.key}:${item.id}">
         <p class="drink-name">${item.name}</p>
-        <p class="drink-price">${item.isOther ? '金額を入力' : (item.priceLabel || `¥${item.price.toLocaleString()}`)}</p>
-      </div>`).join('');
+        <p class="drink-price">${priceLine}</p>
+      </div>`;
+    }).join('');
     return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns}</div>`;
   }).join('');
 }
@@ -781,6 +787,29 @@ function attachExtraSalesEvents() {
 
       // 「その他」項目は固定金額を持たないため、タップ時にその場で金額を入力してもらう。
       if (item.isOther) {
+        // ラビ販売の「その他」は、支払金額とお渡しするラビ枚数が一致しない
+        // （ボーナス分がある）ケースがあるため、2つとも個別に入力してもらう。
+        if (cat.key === 'rabi') {
+          const priceStr = window.prompt('お支払い金額を入力してください（円）', '');
+          if (priceStr === null) return; // キャンセル
+          const price = parseInt(priceStr, 10);
+          if (isNaN(price) || price <= 0) { showToast('⚠️ 正しい金額を入力してください'); return; }
+          const rabiStr = window.prompt('お渡しするラビ枚数を入力してください', String(price));
+          if (rabiStr === null) return; // キャンセル
+          const rabiAmount = parseInt(rabiStr, 10);
+          if (isNaN(rabiAmount) || rabiAmount <= 0) { showToast('⚠️ 正しいラビ枚数を入力してください'); return; }
+          c.extraSales.push({
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            category: cat.key, itemId: item.id, name: `${rabiAmount.toLocaleString()}ラビ`,
+            qty: 1, unit: null, unitPrice: price, amount: price,
+            timestamp: Date.now()
+          });
+          saveData();
+          showToast(`${rabiAmount.toLocaleString()}ラビ を追加しました（+¥${price.toLocaleString()}）`);
+          render();
+          return;
+        }
+
         const amountStr = window.prompt(`${cat.label.replace(/^\S+\s/, '')}「その他」の金額を入力してください（円）`, '');
         if (amountStr === null) return; // キャンセル
         const amount = parseInt(amountStr, 10);
