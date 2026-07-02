@@ -145,7 +145,7 @@ function importBackupFile(file) {
           // app.js の loadData() と同じロジック：
           // 「お菓子」「カップ麺」は自由編集＋新規デフォルト品目の補完、
           // それ以外（ラビ等）の固定メニューは常に最新のデフォルト定義を使う。
-          const isEditableCat = defCat.key === 'snack' || defCat.key === 'noodle';
+          const isEditableCat = defCat.key === 'snack' || defCat.key === 'noodle' || defCat.key === 'other';
           if (!isEditableCat) return { ...defCat };
           const savedItems = Array.isArray(saved.items) ? saved.items : defCat.items;
           const savedIds = new Set(savedItems.map(i => i.id));
