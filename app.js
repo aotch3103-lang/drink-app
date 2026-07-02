@@ -71,6 +71,13 @@ const DEFAULT_EXTRA_MENU = [
     ]
   },
   {
+    // お菓子・カップ麺のどちらにも当てはまらない商品を自由に登録できるカテゴリ。
+    // お菓子・カップ麺と同じく EXTRA_EDITABLE_CATEGORY_KEYS に含め、
+    // メニュー管理タブから自由に追加・削除・価格編集できるようにする。
+    key: 'other', label: '🎁 その他', mode: 'tap',
+    items: []
+  },
+  {
     key: 'lesson', label: '📚 麻雀教室（10分100円）', shortLabel: '麻雀教室', mode: 'time',
     ratePer10Min: 100, presetMinutes: [10, 20, 30, 60] // ※時間計算方式は後日再検討予定の暫定仕様
   }
@@ -130,7 +137,7 @@ function loadData() {
         // 保存データを尊重しつつ、アプリ更新で増えた新しいデフォルト品目だけを補完する。
         // 「ラビ」など編集不可の固定メニューは、表示内容の更新（例：ラビ枚数表記の変更）が
         // 常に反映されるよう、保存データに関わらず常に最新のデフォルト定義を使う。
-        const isEditableCat = defCat.key === 'snack' || defCat.key === 'noodle';
+        const isEditableCat = defCat.key === 'snack' || defCat.key === 'noodle' || defCat.key === 'other';
         if (!isEditableCat) return { ...defCat };
         const savedItems = Array.isArray(saved.items) ? saved.items : defCat.items;
         const savedIds = new Set(savedItems.map(i => i.id));
@@ -505,7 +512,7 @@ function moveMenu(index, direction) {
    ラビ／貸卓／ドリンク単品／麻雀教室は固定の品揃え・計算方式のため対象外。
    snack・noodle の2カテゴリだけ、既存の「メニュー管理」と同じ操作感で
    品目を自由に増減できるようにする。 */
-const EXTRA_EDITABLE_CATEGORY_KEYS = ['snack', 'noodle'];
+const EXTRA_EDITABLE_CATEGORY_KEYS = ['snack', 'noodle', 'other'];
 
 function renderExtraMenuManageRows() {
   const container = document.getElementById('extra-menu-list-container');
@@ -651,6 +658,12 @@ function closeDrinkPopup() {
   const amountInput = document.getElementById('popup-amount-input');
   if (amountSection) amountSection.style.display = 'none';
   if (amountInput) { amountInput.value = ''; amountInput.oninput = null; }
+  const rabiSection = document.getElementById('popup-rabi-section');
+  const rabiPriceInput = document.getElementById('popup-rabi-price-input');
+  const rabiAmountInput = document.getElementById('popup-rabi-amount-input');
+  if (rabiSection) rabiSection.style.display = 'none';
+  if (rabiPriceInput) { rabiPriceInput.value = ''; rabiPriceInput.oninput = null; }
+  if (rabiAmountInput) rabiAmountInput.value = '';
 }
 
 /* ---------- 追加売上（お菓子・カップ麺）注文ポップアップ ----------
@@ -674,12 +687,29 @@ function openExtraItemPopup(catKey, itemId) {
 
   const amountSection = document.getElementById('popup-amount-section');
   const amountInput = document.getElementById('popup-amount-input');
+  const rabiSection = document.getElementById('popup-rabi-section');
+  const rabiPriceInput = document.getElementById('popup-rabi-price-input');
+  const rabiAmountInput = document.getElementById('popup-rabi-amount-input');
   const totalEl = document.getElementById('popup-total-price');
   const orderBtn = document.getElementById('popup-order-btn');
   orderBtn.disabled = false; orderBtn.style.opacity = '1';
 
-  if (item.isOther) {
+  // ラビ販売の「その他」は、支払金額とお渡しするラビ枚数が一致しない
+  // （ボーナス分がある）ケースがあるため、専用の2項目入力欄を使う。
+  const isRabiOther = item.isOther && cat.key === 'rabi';
+
+  if (isRabiOther) {
+    amountSection.style.display = 'none';
+    rabiSection.style.display = '';
+    rabiPriceInput.value = ''; rabiAmountInput.value = '';
+    totalEl.textContent = '¥0';
+    rabiPriceInput.oninput = () => {
+      const v = parseInt(rabiPriceInput.value, 10);
+      totalEl.textContent = `¥${(isNaN(v) || v < 0 ? 0 : v).toLocaleString()}`;
+    };
+  } else if (item.isOther) {
     // 「その他」：金額をポップアップ内で入力してもらう
+    rabiSection.style.display = 'none';
     amountSection.style.display = '';
     amountInput.value = '';
     totalEl.textContent = '¥0';
@@ -689,6 +719,7 @@ function openExtraItemPopup(catKey, itemId) {
     };
   } else {
     amountSection.style.display = 'none';
+    rabiSection.style.display = 'none';
     totalEl.textContent = `¥${item.price.toLocaleString()}`;
   }
 
@@ -698,6 +729,25 @@ function openExtraItemPopup(catKey, itemId) {
     const c = getCustomer(selectedId);
     if (!c) return;
     if (!c.extraSales) c.extraSales = [];
+
+    if (isRabiOther) {
+      const price = parseInt(rabiPriceInput.value, 10);
+      const rabiAmount = parseInt(rabiAmountInput.value, 10);
+      if (isNaN(price) || price <= 0) { showToast('⚠️ 正しい金額を入力してください'); return; }
+      if (isNaN(rabiAmount) || rabiAmount <= 0) { showToast('⚠️ 正しいラビ枚数を入力してください'); return; }
+      c.extraSales.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        category: cat.key, itemId: item.id, name: `${rabiAmount.toLocaleString()}ラビ`,
+        qty: 1, unit: null, unitPrice: price, amount: price,
+        timestamp: Date.now()
+      });
+      saveData();
+      closeDrinkPopup();
+      showToast(`${rabiAmount.toLocaleString()}ラビ を追加しました（+¥${price.toLocaleString()}）`);
+      render();
+      return;
+    }
+
     let amount = item.price;
     if (item.isOther) {
       amount = parseInt(amountInput.value, 10);
@@ -716,7 +766,8 @@ function openExtraItemPopup(catKey, itemId) {
   };
 
   document.getElementById('drink-popup-overlay').classList.add('show');
-  if (item.isOther) setTimeout(() => amountInput.focus(), 50);
+  if (isRabiOther) setTimeout(() => rabiPriceInput.focus(), 50);
+  else if (item.isOther) setTimeout(() => amountInput.focus(), 50);
 }
 
 /* ---------- チケット№管理ポップアップ ---------- */
@@ -812,6 +863,9 @@ function renderExtraMenuHTML() {
         </div>`).join('');
       return `<p class="popup-section-label" style="margin-top:14px;">${cat.label}</p><div class="drink-grid">${btns || '<p style="color:var(--text-muted);font-size:13px;">メニューがありません</p>'}</div>`;
     }
+    // 商品が1件も無いカテゴリ（新設直後の「その他」等）は、空のセクションを
+    // 表示せず丸ごとスキップする。
+    if (!cat.items || cat.items.length === 0) return '';
     const btns = (cat.items || []).map(item => {
       const priceLine = item.isOther
         ? (cat.key === 'rabi' ? '金額・枚数を入力' : '金額を入力')
@@ -867,31 +921,15 @@ function attachExtraSalesEvents() {
         return;
       }
 
+      // ラビ販売の「その他」も同じく確認ポップアップ内で入力してもらう
+      // （支払金額とお渡しするラビ枚数の2項目）。
+      if (catKey === 'rabi' && item.isOther) {
+        openExtraItemPopup(catKey, itemId);
+        return;
+      }
+
       // 「その他」項目は固定金額を持たないため、タップ時にその場で金額を入力してもらう。
       if (item.isOther) {
-        // ラビ販売の「その他」は、支払金額とお渡しするラビ枚数が一致しない
-        // （ボーナス分がある）ケースがあるため、2つとも個別に入力してもらう。
-        if (cat.key === 'rabi') {
-          const priceStr = window.prompt('お支払い金額を入力してください（円）', '');
-          if (priceStr === null) return; // キャンセル
-          const price = parseInt(priceStr, 10);
-          if (isNaN(price) || price <= 0) { showToast('⚠️ 正しい金額を入力してください'); return; }
-          const rabiStr = window.prompt('お渡しするラビ枚数を入力してください', String(price));
-          if (rabiStr === null) return; // キャンセル
-          const rabiAmount = parseInt(rabiStr, 10);
-          if (isNaN(rabiAmount) || rabiAmount <= 0) { showToast('⚠️ 正しいラビ枚数を入力してください'); return; }
-          c.extraSales.push({
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            category: cat.key, itemId: item.id, name: `${rabiAmount.toLocaleString()}ラビ`,
-            qty: 1, unit: null, unitPrice: price, amount: price,
-            timestamp: Date.now()
-          });
-          saveData();
-          showToast(`${rabiAmount.toLocaleString()}ラビ を追加しました（+¥${price.toLocaleString()}）`);
-          render();
-          return;
-        }
-
         const amountStr = window.prompt(`${cat.label.replace(/^\S+\s/, '')}「その他」の金額を入力してください（円）`, '');
         if (amountStr === null) return; // キャンセル
         const amount = parseInt(amountStr, 10);
@@ -1083,7 +1121,7 @@ function renderListView() {
           </div>
         </div>
         <div class="card">
-          <p class="section-title">🍘 お菓子・カップ麺（追加売上メニュー） ※価格は直接編集</p>
+          <p class="section-title">🍘 お菓子・カップ麺・その他（追加売上メニュー） ※価格は直接編集</p>
           <div id="extra-menu-list-container"></div>
         </div>
         <div class="card">
@@ -1093,6 +1131,7 @@ function renderListView() {
               <select id="extra-menu-category" style="height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:15px;background:var(--surface-1);color:var(--text-primary);outline:none;">
                 <option value="snack">🍘 お菓子</option>
                 <option value="noodle">🍜 カップ麺</option>
+                <option value="other">🎁 その他</option>
               </select>
               <input class="inp-name" type="text" id="extra-menu-name" placeholder="商品名（例：柿の種）" maxlength="15" inputmode="text" lang="ja" autocomplete="off" />
               <input class="inp-price" type="number" id="extra-menu-price" placeholder="金額" min="0" max="9999" step="50" />

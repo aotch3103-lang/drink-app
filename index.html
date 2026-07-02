@@ -69,6 +69,16 @@
             <input type="number" id="popup-amount-input" min="0" inputmode="numeric" placeholder="金額を入力" style="flex:1;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:16px;background:var(--surface-1);color:var(--text-primary);outline:none;" />
           </div>
         </div>
+        <div id="popup-rabi-section" style="display:none;">
+          <p class="popup-section-label">お支払い金額（円）</p>
+          <div class="popup-option-row">
+            <input type="number" id="popup-rabi-price-input" min="0" inputmode="numeric" placeholder="例：3,000" style="flex:1;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:16px;background:var(--surface-1);color:var(--text-primary);outline:none;" />
+          </div>
+          <p class="popup-section-label" style="margin-top:12px;">お渡しするラビ枚数</p>
+          <div class="popup-option-row">
+            <input type="number" id="popup-rabi-amount-input" min="0" inputmode="numeric" placeholder="例：3,300" style="flex:1;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:16px;background:var(--surface-1);color:var(--text-primary);outline:none;" />
+          </div>
+        </div>
         <p class="popup-total-price" id="popup-total-price"></p>
         <div class="popup-actions">
           <button class="popup-cancel-btn" id="popup-cancel-btn">キャンセル</button>
