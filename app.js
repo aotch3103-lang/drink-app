@@ -160,6 +160,9 @@ let menuSearchQuery = ''; // メニュー管理タブのドリンク名検索（
 let historyFrom = '', historyTo = ''; // 履歴タブの日付絞り込み（from/to）。タブを行き来しても値は保持される。
 let lastBackupAt = localStorage.getItem(STORAGE_KEY + '-last-backup') || ''; // 最終バックアップ日時（ページ再読込しても保持／reset.jsが更新）
 let popupItemId = null, popupSelectedSize = null, popupSelectedTemp = null;
+// 追加売上メニュー（お菓子・カップ麺）用のポップアップ状態。
+// null以外の時は、ドリンク用ではなく追加売上用としてポップアップが開いている。
+let popupExtraRef = null; // { catKey, itemId } 形式
 let manageTicketsId = null;
 
 function getCustomer(id) { return customers.find(c => c.id === id); }
@@ -642,6 +645,78 @@ function attachPopupEvents() {
 function closeDrinkPopup() {
   document.getElementById('drink-popup-overlay').classList.remove('show');
   popupItemId = null;
+  popupExtraRef = null;
+  // 「その他」用の金額入力欄は次回に持ち越さないよう毎回リセットして隠す
+  const amountSection = document.getElementById('popup-amount-section');
+  const amountInput = document.getElementById('popup-amount-input');
+  if (amountSection) amountSection.style.display = 'none';
+  if (amountInput) { amountInput.value = ''; amountInput.oninput = null; }
+}
+
+/* ---------- 追加売上（お菓子・カップ麺）注文ポップアップ ----------
+   ドリンク注文ポップアップと同じ見た目・操作感（タップ→確認→注文する）で、
+   会計はチケット残高からは引かず、従来通り「追加売上（extraSales）」に記録する。
+   ドリンク用のポップアップDOM（drink-popup-overlay）をそのまま再利用している。 */
+function openExtraItemPopup(catKey, itemId) {
+  const cat = extraMenu.find(x => x.key === catKey);
+  const item = cat && (cat.items || []).find(i => i.id === itemId);
+  if (!cat || !item) return;
+  popupExtraRef = { catKey, itemId };
+  popupItemId = null; // ドリンク用の状態はクリアしておく
+
+  const catName = cat.label.replace(/^\S+\s/, '');
+  document.getElementById('popup-drink-name').textContent = item.name;
+  document.getElementById('popup-drink-base-price').textContent = catName;
+
+  // サイズ・温度セクションは追加売上メニューでは使わないので隠す
+  document.getElementById('popup-size-section').style.display = 'none';
+  document.getElementById('popup-temp-section').style.display = 'none';
+
+  const amountSection = document.getElementById('popup-amount-section');
+  const amountInput = document.getElementById('popup-amount-input');
+  const totalEl = document.getElementById('popup-total-price');
+  const orderBtn = document.getElementById('popup-order-btn');
+  orderBtn.disabled = false; orderBtn.style.opacity = '1';
+
+  if (item.isOther) {
+    // 「その他」：金額をポップアップ内で入力してもらう
+    amountSection.style.display = '';
+    amountInput.value = '';
+    totalEl.textContent = '¥0';
+    amountInput.oninput = () => {
+      const v = parseInt(amountInput.value, 10);
+      totalEl.textContent = `¥${(isNaN(v) || v < 0 ? 0 : v).toLocaleString()}`;
+    };
+  } else {
+    amountSection.style.display = 'none';
+    totalEl.textContent = `¥${item.price.toLocaleString()}`;
+  }
+
+  document.getElementById('popup-cancel-btn').onclick = closeDrinkPopup;
+  document.getElementById('drink-popup-overlay').onclick = (e) => { if (e.target === e.currentTarget) closeDrinkPopup(); };
+  orderBtn.onclick = () => {
+    const c = getCustomer(selectedId);
+    if (!c) return;
+    if (!c.extraSales) c.extraSales = [];
+    let amount = item.price;
+    if (item.isOther) {
+      amount = parseInt(amountInput.value, 10);
+      if (isNaN(amount) || amount <= 0) { showToast('⚠️ 正しい金額を入力してください'); return; }
+    }
+    c.extraSales.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      category: cat.key, itemId: item.id, name: item.name,
+      qty: 1, unit: null, unitPrice: amount, amount,
+      timestamp: Date.now()
+    });
+    saveData();
+    closeDrinkPopup();
+    showToast(`${item.name} を追加しました（+¥${amount.toLocaleString()}）`);
+    render();
+  };
+
+  document.getElementById('drink-popup-overlay').classList.add('show');
+  if (item.isOther) setTimeout(() => amountInput.focus(), 50);
 }
 
 /* ---------- チケット№管理ポップアップ ---------- */
@@ -784,6 +859,13 @@ function attachExtraSalesEvents() {
       const c = getCustomer(selectedId);
       if (!item || !c) return;
       if (!c.extraSales) c.extraSales = [];
+
+      // お菓子・カップ麺はドリンクメニューと同じ操作感：
+      // タップ → 確認ポップアップ →「注文する」で確定（「その他」は金額入力もポップアップ内で）
+      if (catKey === 'snack' || catKey === 'noodle') {
+        openExtraItemPopup(catKey, itemId);
+        return;
+      }
 
       // 「その他」項目は固定金額を持たないため、タップ時にその場で金額を入力してもらう。
       if (item.isOther) {

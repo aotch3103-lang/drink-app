@@ -63,6 +63,12 @@
           <p class="popup-section-label">温度</p>
           <div class="popup-option-row" id="popup-temp-row"></div>
         </div>
+        <div id="popup-amount-section" style="display:none;">
+          <p class="popup-section-label">金額（円）</p>
+          <div class="popup-option-row">
+            <input type="number" id="popup-amount-input" min="0" inputmode="numeric" placeholder="金額を入力" style="flex:1;height:44px;border:1.5px solid var(--border);border-radius:var(--radius-pill);padding:0 14px;font-size:16px;background:var(--surface-1);color:var(--text-primary);outline:none;" />
+          </div>
+        </div>
         <p class="popup-total-price" id="popup-total-price"></p>
         <div class="popup-actions">
           <button class="popup-cancel-btn" id="popup-cancel-btn">キャンセル</button>
